@@ -61,23 +61,25 @@ All modules are containerized for reproducible deployment and long-term unattend
 - **Docker & Docker Compose** for full containerized deployment
 - **Notification Service:** [ntfy](https://ntfy.sh) or equivalent push API
 
+---
+
 ### **System Architecture Diagram**
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Hardware
-        A[BU-353N GPS Receiver] -->|NMEA| B[Raspberry Pi 5]
-        C[Sierra Wireless EM7565 LTE Modem] -->|AT/QMI| B
+        A[BU-353N GPS Receiver] -->|NMEA Stream| B[Raspberry Pi 5]
+        C[Sierra Wireless EM7565 LTE Modem] -->|AT / QMI Interface| B
     end
 
     subgraph Software
-        B --> D[GPS Parser + Movement Calculator]
+        B --> D[GPS Parser & Movement Calculator]
         B --> E[LTE Metadata Collector (Optional)]
-        D --> F[Database (SQLite/Postgres)]
+        D --> F[Database Layer (SQLite / PostgreSQL)]
         E --> F
         F --> G[Geofence Validator (GeoJSON)]
         G --> H[Notification Service (ntfy.sh)]
     end
 
-    style Hardware fill:#eef7ff,stroke:#88a,stroke-width:1px
-    style Software fill:#f9f9f9,stroke:#aaa,stroke-width:1px
+    style Hardware fill:#eaf4ff,stroke:#84a9ff,stroke-width:1px
+    style Software fill:#f9f9f9,stroke:#999,stroke-width:1px
