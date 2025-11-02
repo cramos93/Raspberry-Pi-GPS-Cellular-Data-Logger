@@ -30,7 +30,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 - Log **entry and exit events** with timestamps in the database.  
 - Trigger a **real-time notification** (e.g., via ntfy.sh) upon boundary violation.
 
-### **— Optional: LTE/GSM Metadata Capture**
+### ** Optional Secondary Objective: LTE/GSM Metadata Capture**
 - Interface with a **Sierra Wireless EM7565/EM7511 LTE modem** through AT or QMI commands.  
 - Record contextual **cellular metrics**, including:  
   - Cell ID  
