@@ -81,7 +81,7 @@ graph TB
 
     %% ---------- Software Ingest ----------
     PI ==>|Primary Path| PARSE["⚙️ GPS Parser &<br/>Movement Calculator"]
-    PI -.->|"Optional Path"| META["📡 LTE/GSM Metadata<br/>Parser & Collector"]
+    PI -.->|"Optional Path"| META["📡 LTE/GSM Metadata"]
 
     %% ---------- Core Processing (includes Cellular Logging) ----------
     PARSE ==> CORE["🎯 CORE PROCESSING<br/>━━━━━━━━━━━━━━<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📶 Cellular Logging (LTE/GSM)<br/>📊 Parameter Logging<br/>━━━━━━━━━━━━━━"]
