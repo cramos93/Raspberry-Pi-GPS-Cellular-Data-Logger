@@ -1,4 +1,4 @@
-# **Raspberry Pi GPS–Cellular Data Logger**
+# **Raspberry Pi GPS Logger**
 ### Continuous GPS Logging, Motion Analytics, and Geofence Event Detection — with Optional LTE/GSM Contextual Metadata
 
 ---
