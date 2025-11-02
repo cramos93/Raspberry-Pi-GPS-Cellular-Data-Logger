@@ -75,27 +75,28 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ```mermaid
 graph TB
-    GPS[GPS Receiver<br/>BU-353N] -->|NMEA| PI[Raspberry Pi 5]
-    LTE[LTE Modem<br/>EM7565] -.->|Optional| PI
+    GPS[GPS Receiver<br/>BU-353N] -->|NMEA Stream| PI[Raspberry Pi 5]
     
-    PI --> PARSE[GPS Parser &<br/>Movement Analytics]
-    PI -.-> META[Cellular Metadata<br/>Collector]
+    PI --> PARSE[GPS Parser &<br/>Movement Calculator]
     
-    PARSE -->|Location & Speed| DB[(Database)]
-    META -.->|Cell ID & Signal| DB
+    PARSE -->|Core Function| CORE{{"CONTINUOUS LOGGING<br/>📍 Location<br/>⚡ Speed<br/>🧭 Heading<br/>📊 Movement Parameters"}}
     
-    DB --> FENCE{Geofence<br/>Validator}
-    FENCE -->|Boundary Crossed| NOTIFY[Push Notification]
-    FENCE -->|Within Bounds| DB
+    CORE -->|Primary Data Flow| DB[(Time-Series<br/>Database)]
     
-    style GPS fill:#90caf9,stroke:#1565c0,stroke-width:2px
-    style PI fill:#ce93d8,stroke:#6a1b9a,stroke-width:2px
-    style PARSE fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px
-    style DB fill:#fff59d,stroke:#f57f17,stroke-width:2px
-    style FENCE fill:#ffab91,stroke:#d84315,stroke-width:2px
-    style NOTIFY fill:#ef9a9a,stroke:#c62828,stroke-width:2px
-    style LTE fill:#b0bec5,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
-    style META fill:#b0bec5,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+    DB -.->|Optional Feature| FENCE[Geofence<br/>Validator]
+    FENCE -.-> NOTIFY[Push<br/>Notification]
+    
+    PI -.->|Optional Feature| META[LTE/GSM<br/>Metadata]
+    META -.->|Cell Data| DB
+    
+    style GPS fill:#64b5f6,stroke:#1976d2,stroke-width:2px
+    style PI fill:#81c784,stroke:#388e3c,stroke-width:2px
+    style PARSE fill:#4db6ac,stroke:#00796b,stroke-width:2px
+    style CORE fill:#ffd54f,stroke:#f57c00,stroke-width:4px
+    style DB fill:#ffb74d,stroke:#e64a19,stroke-width:3px
+    style FENCE fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
+    style NOTIFY fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
+    style META fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
 ```
 
 For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
