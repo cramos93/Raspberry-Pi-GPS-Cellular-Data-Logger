@@ -69,15 +69,15 @@ All modules are containerized for reproducible deployment and long-term unattend
 flowchart TD
     subgraph Hardware
         A[BU-353N GPS Receiver] -->|NMEA Stream| B[Raspberry Pi 5]
-        C[Sierra Wireless EM7565 LTE Modem] -->|AT / QMI Interface| B
+        C[Sierra Wireless EM7565 LTE Modem] -->|AT or QMI Interface| B
     end
 
     subgraph Software
-        B --> D[GPS Parser & Movement Calculator]
+        B --> D[GPS Parser and Movement Calculator]
         B --> E[LTE Metadata Collector (Optional)]
-        D --> F[Database Layer (SQLite / PostgreSQL)]
+        D --> F[Database Layer (SQLite or PostgreSQL)]
         E --> F
-        F --> G[Geofence Validator (GeoJSON)]
+        F --> G[Geofence Validator (GeoJSON Boundary)]
         G --> H[Notification Service (ntfy.sh)]
     end
 
