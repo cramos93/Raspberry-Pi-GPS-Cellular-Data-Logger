@@ -69,28 +69,26 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ### **System Architecture Diagram**
 
-If Mermaid diagrams are not rendering in this environment, refer to the static system diagram below.  
-The dashed line and components represent the **optional LTE/GSM capture module**.
+```mermaid
+graph TD
+    %% ===== Hardware Layer =====
+    subgraph Hardware
+        A[BU-353N GPS Receiver] --> B[Raspberry Pi 5]
+        C[Sierra Wireless EM7565 LTE Modem — Optional] -.-> B
+    end
 
-![System Architecture Diagram](docs/system_architecture.png)
+    %% ===== Software Layer =====
+    subgraph Software
+        B --> D[GPS Parser and Movement Calculator]
+        D --> F[Database Layer (SQLite / PostgreSQL)]
+        F --> G[Geofence Validator (GeoJSON Boundary)]
+        G --> H[Notification Service (ntfy.sh)]
+        B -.-> E[LTE/GSM Metadata Collector — Optional]
+        E -.-> F
+    end
 
-🟢 **Legend:**  
-- **Solid lines/components:** Core GPS and geofence system (primary objective)  
-- **Dashed lines/components:** Optional LTE/GSM contextual module (secondary objective)
-
----
-
-## **4. Project Deliverables**
-
-### **Codebase**
-- **GPS Data Ingestion:** Serial NMEA parsing and logging  
-- **Movement Analytics:** Compute speed, heading, and bearing vectors  
-- **Database Management:** Schema creation and persistent time-series storage  
-- **Geofence Validation:** GeoJSON boundary enforcement with spatial queries  
-- **Notification Trigger:** HTTP event push to ntfy or equivalent  
-- **— Optional LTE/GSM Module:** Cellular metadata capture and correlation with GPS logs  
-- **Containerization:** Dockerfile and Compose setup for modular execution  
-
----
-
-### **Repository Structure**
+    %% ===== Styling =====
+    style Hardware fill:#eaf4ff,stroke:#84a9ff,stroke-width:1px
+    style Software fill:#f9f9f9,stroke:#999,stroke-width:1px
+    classDef dashed stroke-dasharray: 4,3;
+    class C,E dashed;
