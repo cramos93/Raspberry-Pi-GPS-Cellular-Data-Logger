@@ -90,8 +90,8 @@ graph TB
     
     DB -->|"Export"| FILES["📁 File Outputs<br/>CSV / GeoJSON<br/>Merged GPS+Cellular Data"]
     
-    DB -.->|"Feature Branch"| FENCE["🗺️ Geofence Validator<br/>GeoJSON - Optional"]
-    FENCE -.->|"On Violation"| NOTIFY["🔔 Push Notification<br/>ntfy.sh - Optional"]
+    DB -.->|"Feature Branch"| FENCE["🗺️ Geofence Validator<br/>GeoJSON"]
+    FENCE -.->|"On Violation"| NOTIFY["🔔 Push Notification<br/>ntfy.sh"]
     
     classDef hardware fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000
     classDef hardwareOpt fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,stroke-dasharray: 5 5,color:#666
