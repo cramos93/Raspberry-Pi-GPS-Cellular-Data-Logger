@@ -67,23 +67,18 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ---
 
-### **System Architecture Diagram**
+## **System Architecture Diagram**
 
 ```mermaid
 graph TD
     A[BU-353N GPS Receiver] -->|NMEA Stream| B[Raspberry Pi 5]
-    C[Sierra Wireless EM7565 LTE Modem - Optional] -.->|AT/QMI Interface| B
+    C[Sierra Wireless EM7565 LTE Modem — Optional] -.->|AT/QMI Interface| B
     B --> D[GPS Parser and Movement Calculator]
-    B -.-> E[LTE/GSM Metadata Collector - Optional]
+    B -.-> E[LTE/GSM Metadata Collector — Optional]
     D --> F[Database Layer]
     E -.-> F
     F --> G[Geofence Validator]
     G --> H[Notification Service]
-    
+
     style C stroke-dasharray: 5 5
     style E stroke-dasharray: 5 5
-```
-
-For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
-
----
