@@ -83,10 +83,10 @@ graph TB
     
     CORE -->|Primary Data Flow| DB[(Time-Series<br/>Database)]
     
-    DB -.->|Optional Feature| FENCE[Geofence<br/>Validator]
+    DB -.->| Geofense Objective| FENCE[Geofence<br/>Validator]
     FENCE -.-> NOTIFY[Push<br/>Notification]
     
-    PI -.->|Optional Feature| META[LTE/GSM<br/>Metadata]
+    PI -.->|Optional Objective | META[LTE/GSM<br/>Metadata]
     META -.->|Cell Data| DB
     
     style GPS fill:#64b5f6,stroke:#1976d2,stroke-width:2px
