@@ -14,8 +14,6 @@
 ### **Secondary Objective (Optional)**
 - **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem. This allows correlation of spatial and signal data for contextualized geolocation analytics.
 
-**Note:** The geofence is a configurable variable and not the defining objective of the project.
-
 All modules are containerized for reproducible deployment and long-term unattended operation.
 
 ---
