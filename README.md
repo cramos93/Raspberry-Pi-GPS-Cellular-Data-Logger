@@ -22,7 +22,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 ## **2. Project Design Overview**
 
 ### **Core Functionality**
-- Continuously log **GPS NMEA sentences** from a **BU-353N GPS puck** connected via USB.  
+- Continuously log **GPS NMEA sentences** from a **GlobalSat BU-353N GPS puck** connected via USB.  
 - Parse and store **latitude, longitude, timestamp, altitude, speed, and heading** in a structured database.  
 - Compute movement metrics using delta position and Haversine-based distance calculations.  
 - Execute automatically on boot using a **systemd service** or **Docker container**.
@@ -74,7 +74,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 ```mermaid
 graph TB
     %% ---------- Hardware ----------
-    GPS["📡 GPS Receiver<br/>BU-353N<br/><i>Hardware</i>"]
+    GPS["📡 GPS Receiver<br/>GlobalSat BU-353N<br/><i>Hardware</i>"]
     LTE["📶 LTE Modem EM7565/EM7511<br/><i>Hardware · Optional</i>"]
 
     GPS -->|USB/NMEA| PI{{"💻 RASPBERRY PI 5<br/>Central Processing Unit<br/><i>Software Runtime</i>"}}
