@@ -60,7 +60,6 @@ All modules are containerized for reproducible deployment and long-term unattend
 - **Raspberry Pi 5 (8 GB)** with Raspberry Pi OS (Bookworm)  
 - **GlobalSat BU-353N GPS Receiver (USB, SiRF Star IV)**  
 - **— Optional:** Sierra Wireless EM7565 / EM7511 LTE Modem (USB interface)  
-- **— Optional:** Panda PAU09 Wi-Fi Adapter for future survey expansion  
 
 ### **Software**
 - **Python 3.x**
