@@ -74,26 +74,28 @@ All modules are containerized for reproducible deployment and long-term unattend
 ### **System Architecture Diagram**
 
 ```mermaid
-graph TD
-    subgraph Primary["PRIMARY OBJECTIVES"]
-        A[BU-353N GPS Receiver] -->|NMEA Stream| B[Raspberry Pi 5]
-        B --> D[GPS Parser and Movement Calculator]
-        D -->|1. Continuous Location Logging| F[Database Layer]
-        D -->|2. Speed & Heading Calculation| F
-        F -->|3. Geofence Boundary Check| G[Geofence Validator]
-        G -->|4. Boundary Violation| H[Notification Service]
-    end
+graph TB
+    GPS[GPS Receiver<br/>BU-353N] -->|NMEA| PI[Raspberry Pi 5]
+    LTE[LTE Modem<br/>EM7565] -.->|Optional| PI
     
-    subgraph Secondary["SECONDARY OBJECTIVE - Optional"]
-        C[Sierra Wireless EM7565<br/>LTE Modem] -.->|AT/QMI Interface| B
-        B -.-> E[LTE/GSM Metadata Collector]
-        E -.->|Cell ID, RSRP, Band| F
-    end
+    PI --> PARSE[GPS Parser &<br/>Movement Analytics]
+    PI -.-> META[Cellular Metadata<br/>Collector]
     
-    style Primary fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    style Secondary fill:#fff3e0,stroke:#f57c00,stroke-width:2px,stroke-dasharray: 5 5
-    style C stroke-dasharray: 5 5
-    style E stroke-dasharray: 5 5
+    PARSE -->|Location & Speed| DB[(Database)]
+    META -.->|Cell ID & Signal| DB
+    
+    DB --> FENCE{Geofence<br/>Validator}
+    FENCE -->|Boundary Crossed| NOTIFY[Push Notification]
+    FENCE -->|Within Bounds| DB
+    
+    style GPS fill:#90caf9,stroke:#1565c0,stroke-width:2px
+    style PI fill:#ce93d8,stroke:#6a1b9a,stroke-width:2px
+    style PARSE fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px
+    style DB fill:#fff59d,stroke:#f57f17,stroke-width:2px
+    style FENCE fill:#ffab91,stroke:#d84315,stroke-width:2px
+    style NOTIFY fill:#ef9a9a,stroke:#c62828,stroke-width:2px
+    style LTE fill:#b0bec5,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+    style META fill:#b0bec5,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
 ```
 
 For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
