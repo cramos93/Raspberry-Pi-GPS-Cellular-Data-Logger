@@ -1,4 +1,4 @@
-# **Raspberry Pi GPS–Cellular Data Logger**
+# **Raspberry Pi GPS Data Logger**
 ### Continuous GPS Logging, Motion Analytics, and Geofence Event Detection — with Optional LTE/GSM Contextual Metadata
 
 ---
@@ -11,7 +11,7 @@
 - Define and enforce a **geofence** using a GeoJSON boundary file.  
 - Trigger a **real-time notification** when the geofence is crossed.
 
-### **Secondary Objective (Optional)**
+### **Secondary Objective**
 - **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem.  
   This allows correlation of spatial and signal data for contextualized geolocation analytics.
 
