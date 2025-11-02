@@ -64,7 +64,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 ```mermaid
 graph TD
     subgraph Hardware
-        A[BU-353N GPS Receiver] --> B[Raspberry Pi 5]
+        A[GlobalSat BU-353N GPS Receiver] --> B[Raspberry Pi 5]
         C[Sierra Wireless EM7565 LTE Modem] --> B
     end
     subgraph Software
