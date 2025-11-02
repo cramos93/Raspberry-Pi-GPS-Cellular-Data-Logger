@@ -28,7 +28,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 - Execute automatically on boot using a **systemd service** or **Docker container**.
 
 ### **Geofence and Notification Logic**
-- Load a **GeoJSON file** defining the geofence polygon or radius boundary.  
+- Load a **GeoJSON** file defining the geofence polygon or radius boundary.  
 - Continuously validate current position against the geofence area.  
 - Log **entry and exit events** with timestamps in the database.  
 - Trigger a **real-time notification** (e.g., via ntfy.sh) upon boundary violation.
@@ -49,7 +49,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 ```mermaid
 graph TB
     %% ---------- Hardware ----------
-    GPS["🔌 GPS Receiver<br/>BU-353N<br/><i>Hardware</i>"]
+    GPS["📡 GPS Receiver<br/>BU-353N<br/><i>Hardware</i>"]
     LTE["📶 LTE Modem EM7565<br/><i>Hardware - Optional</i>"]
 
     GPS -->|USB/NMEA| PI{{"💻 RASPBERRY PI 5<br/>Central Processing Unit<br/><i>Software Runtime</i>"}}
@@ -59,28 +59,30 @@ graph TB
     PI ==>|Primary Path| PARSE["⚙️ GPS Parser &<br/>Movement Calculator"]
     PI -.->|"Optional Path"| META["📡 LTE/GSM Metadata<br/>Parser & Collector"]
 
-    %% ---------- Core Processing (hexagonal symbol) ----------
+    %% ---------- Core Processing (hexagonal node) ----------
     PARSE ==> CORE{{"🎯 CORE PROCESSING<br/>━━━━━━━━━━━━━━<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📶 Cellular Logging (LTE/GSM)<br/>📊 Parameter Logging<br/>━━━━━━━━━━━━━━"}}
     META -.->|"Cell Metrics Processing"| CORE
 
     %% ---------- Database & Outputs ----------
     CORE ==>|Primary Data Flow| DB[("💾 Time-Series Database<br/>SQLite / PostgreSQL")]
-    DB -->|"Export"| FILES["📁 File Outputs<br/>CSV / GeoJSON<br/>Merged GPS + Cellular Data"]
+    DB -->|"Export"| FILES["📁 File Outputs<br/>CSV / GeoJSON<br/>Merged GPS+Cellular Data"]
 
     %% ---------- Geofence & Notification (optional feature branch) ----------
     DB -.->|"Feature Branch"| FENCE["🗺️ Geofence Validator<br/>GeoJSON - Optional"]
     FENCE -.->|"On Violation"| NOTIFY["🔔 Push Notification<br/>ntfy.sh - Optional"]
 
     %% ---------- Styles ----------
-    classDef hardware fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000
-    classDef hardwareOpt fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,stroke-dasharray:5 5,color:#666
+    classDef hardware fill:#e0e0e0,stroke:#424242,stroke-width:2px,color:#000
+    classDef hardwareOpt fill:#eeeeee,stroke:#616161,stroke-width:2px,stroke-dasharray: 5 5,color:#666
     classDef central fill:#4caf50,stroke:#1b5e20,stroke-width:4px,color:#000
     classDef core fill:#ffe082,stroke:#f9a825,stroke-width:3px,color:#000
     classDef software fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
     classDef softwareOpt fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray:5 5,color:#666
     classDef database fill:#ffb74d,stroke:#e64a19,stroke-width:2px,color:#000
-    classDef optional fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,stroke-dasharray:5 5,color:#666
+    classDef export fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000
+    classDef optional fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,stroke-dasharray: 5 5,color:#666
 
+    %% ---------- Node Class Assignments ----------
     class GPS hardware
     class LTE hardwareOpt
     class PI central
@@ -88,5 +90,5 @@ graph TB
     class META softwareOpt
     class CORE core
     class DB database
-    class FILES software
+    class FILES export
     class FENCE,NOTIFY optional
