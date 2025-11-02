@@ -75,28 +75,47 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ```mermaid
 graph TB
-    GPS[GPS Receiver<br/>BU-353N] -->|NMEA Stream| PI[Raspberry Pi 5]
+    subgraph HW["🔧 HARDWARE LAYER"]
+        GPS[GPS Receiver<br/>BU-353N]
+        LTE[LTE Modem<br/>EM7565<br/>Optional]
+    end
     
-    PI --> PARSE[GPS Parser &<br/>Movement Calculator]
+    GPS -->|USB/NMEA| PI{{"🖥️ RASPBERRY PI 5<br/>Central Processing Unit"}}
+    LTE -.->|USB/AT Commands| PI
     
-    PARSE -->|Core Function| CORE{{"CONTINUOUS LOGGING<br/>📍 Location<br/>⚡ Speed<br/>🧭 Heading<br/>📊 Movement Parameters"}}
+    subgraph SW["💾 SOFTWARE LAYER"]
+        direction TB
+        PARSE[GPS Parser &<br/>Movement Calculator]
+        CORE["⚙️ CORE PROCESSING<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📊 Parameter Logging"]
+        DB[(Time-Series<br/>Database<br/>SQLite/PostgreSQL)]
+        META[LTE/GSM<br/>Metadata Collector<br/>Optional]
+    end
     
-    CORE -->|Primary Data Flow| DB[(Time-Series<br/>Database)]
-    
-    DB -.->|Optional Feature| FENCE[Geofence<br/>Validator]
-    FENCE -.-> NOTIFY[Push<br/>Notification]
-    
-    PI -.->|Optional Feature| META[LTE/GSM<br/>Metadata]
+    PI --> PARSE
+    PI -.-> META
+    PARSE --> CORE
+    CORE -->|Primary Flow| DB
     META -.->|Cell Data| DB
     
-    style GPS fill:#64b5f6,stroke:#1976d2,stroke-width:2px
-    style PI fill:#81c784,stroke:#388e3c,stroke-width:2px
-    style PARSE fill:#4db6ac,stroke:#00796b,stroke-width:2px
-    style CORE fill:#ffd54f,stroke:#f57c00,stroke-width:4px
-    style DB fill:#ffb74d,stroke:#e64a19,stroke-width:3px
-    style FENCE fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
-    style NOTIFY fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
-    style META fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
+    subgraph OPT["📌 OPTIONAL FEATURES"]
+        FENCE[Geofence<br/>Validator<br/>GeoJSON]
+        NOTIFY[Push Notification<br/>ntfy.sh]
+    end
+    
+    DB -.-> FENCE
+    FENCE -.-> NOTIFY
+    
+    style HW fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style SW fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style OPT fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    style PI fill:#4caf50,stroke:#1b5e20,stroke-width:4px
+    style CORE fill:#ffd54f,stroke:#f57c00,stroke-width:3px
+    style DB fill:#ffb74d,stroke:#e64a19,stroke-width:2px
+    style GPS fill:#90caf9,stroke:#1565c0,stroke-width:2px
+    style LTE fill:#b0bec5,stroke:#455a64,stroke-width:1px,stroke-dasharray: 5 5
+    style META fill:#ce93d8,stroke:#6a1b9a,stroke-width:1px,stroke-dasharray: 5 5
+    style FENCE fill:#bcaaa4,stroke:#5d4037,stroke-width:1px,stroke-dasharray: 5 5
+    style NOTIFY fill:#bcaaa4,stroke:#5d4037,stroke-width:1px,stroke-dasharray: 5 5
 ```
 
 For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
