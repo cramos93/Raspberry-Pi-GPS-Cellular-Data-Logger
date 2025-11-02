@@ -1,16 +1,20 @@
-# **Raspberry Pi GPS Logger**
+# **Raspberry Pi GPS–Cellular Data Logger**
 ### Continuous GPS Logging, Motion Analytics, and Geofence Event Detection — with Optional LTE/GSM Contextual Metadata
 
 ---
 
-## **1. Objective**
+## **1. Objectives**
 
-The purpose of this project is to design and implement an **automated GPS telemetry system** on a **Raspberry Pi 5** that continuously records positional data, computes movement parameters (speed and heading), and enforces a **geofence boundary** defined by a GeoJSON file.  
-When a boundary is crossed, the system generates a **real-time push notification**.  
+### **Primary Objectives**
+- Implement a GPS receiver system on a **Raspberry Pi 5** to record continuous location updates into a centralized database.
+- Calculate and log movement parameters such as **speed** and **heading** over time.
+- Define and enforce a **geofence** using a GeoJSON boundary file.
+- Trigger a **real-time notification** when the geofence is crossed.
 
-— **Optional Objective:**  
-Integrate a **cellular metadata capture module** to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem.  
-This allows correlation of spatial and signal data for contextualized geolocation analytics.  
+### **Secondary Objective (Optional)**
+- **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem. This allows correlation of spatial and signal data for contextualized geolocation analytics.
+
+**Note:** The geofence is a configurable variable and not the defining objective of the project.
 
 All modules are containerized for reproducible deployment and long-term unattended operation.
 
@@ -30,7 +34,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 - Log **entry and exit events** with timestamps in the database.  
 - Trigger a **real-time notification** (e.g., via ntfy.sh) upon boundary violation.
 
-### ** Optional Secondary Objective: LTE/GSM Metadata Capture**
+### **— Optional: LTE/GSM Metadata Capture**
 - Interface with a **Sierra Wireless EM7565/EM7511 LTE modem** through AT or QMI commands.  
 - Record contextual **cellular metrics**, including:  
   - Cell ID  
@@ -67,18 +71,31 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ---
 
-## **System Architecture Diagram**
+### **System Architecture Diagram**
 
 ```mermaid
 graph TD
-    A[BU-353N GPS Receiver] -->|NMEA Stream| B[Raspberry Pi 5]
-    C[Sierra Wireless EM7565 LTE Modem — Optional] -.->|AT/QMI Interface| B
-    B --> D[GPS Parser and Movement Calculator]
-    B -.-> E[LTE/GSM Metadata Collector — Optional]
-    D --> F[Database Layer]
-    E -.-> F
-    F --> G[Geofence Validator]
-    G --> H[Notification Service]
-
+    subgraph Primary["PRIMARY OBJECTIVES"]
+        A[BU-353N GPS Receiver] -->|NMEA Stream| B[Raspberry Pi 5]
+        B --> D[GPS Parser and Movement Calculator]
+        D -->|1. Continuous Location Logging| F[Database Layer]
+        D -->|2. Speed & Heading Calculation| F
+        F -->|3. Geofence Boundary Check| G[Geofence Validator]
+        G -->|4. Boundary Violation| H[Notification Service]
+    end
+    
+    subgraph Secondary["SECONDARY OBJECTIVE - Optional"]
+        C[Sierra Wireless EM7565<br/>LTE Modem] -.->|AT/QMI Interface| B
+        B -.-> E[LTE/GSM Metadata Collector]
+        E -.->|Cell ID, RSRP, Band| F
+    end
+    
+    style Primary fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Secondary fill:#fff3e0,stroke:#f57c00,stroke-width:2px,stroke-dasharray: 5 5
     style C stroke-dasharray: 5 5
     style E stroke-dasharray: 5 5
+```
+
+For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
+
+---
