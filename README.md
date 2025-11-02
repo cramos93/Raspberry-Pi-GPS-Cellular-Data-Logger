@@ -69,6 +69,9 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ### **System Architecture Diagram**
 
+If the diagram does not render automatically, refer to the static version below:  
+![System Architecture Diagram](docs/system_architecture.png)
+
 ```mermaid
 graph TD
     %% ===== Hardware Layer =====
