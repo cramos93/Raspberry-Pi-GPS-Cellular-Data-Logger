@@ -6,15 +6,16 @@
 ## **1. Objectives**
 
 ### **Primary Objectives**
-- Implement a GPS receiver system on a **Raspberry Pi 5** to record continuous location updates into a centralized database.
-- Calculate and log movement parameters such as **speed** and **heading** over time.
-- Define and enforce a **geofence** using a GeoJSON boundary file.
-- Trigger a **real-time notification** when the geofence is crossed.
+- Implement a GPS receiver system on a **Raspberry Pi 5** to record continuous location updates into a centralized database.  
+- Calculate and log movement parameters such as **speed** and **heading** over time.  
+- Define and enforce a **geofence** using a GeoJSON boundary file.  
+- Trigger a **real-time notification** when the geofence is crossed.  
 
 ### **Secondary Objective (Optional)**
-- **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem. This allows correlation of spatial and signal data for contextualized geolocation analytics.
+- **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem.  
+  This enables correlation of spatial and signal data for contextualized geolocation analytics.  
 
-**Note:** The geofence is a configurable variable and not the defining objective of the project.
+**Note:** The geofence is a configurable parameter, not the defining objective of the project.  
 
 All modules are containerized for reproducible deployment and long-term unattended operation.
 
@@ -63,7 +64,7 @@ All modules are containerized for reproducible deployment and long-term unattend
 - **— Optional:** Panda PAU09 Wi-Fi Adapter for future survey expansion  
 
 ### **Software**
-- **Python 3.x**
+- **Python 3.x**  
   - Libraries: `pyserial`, `gps`, `geojson`, `shapely`, `pyproj`, `sqlite3`, `requests`, `datetime`, `re`  
 - **Database:** SQLite (default) or PostgreSQL  
 - **Docker & Docker Compose** for containerized deployment  
@@ -71,34 +72,32 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ---
 
+<div align="center">
+
 ### **System Architecture Diagram**
 
 ```mermaid
 graph TB
     GPS[GPS Receiver<br/>BU-353N] -->|NMEA Stream| PI[Raspberry Pi 5]
-    
-    PI --> PARSE[GPS Parser &<br/>Movement Calculator]
-    
-    PARSE -->|Core Function| CORE{{"CONTINUOUS LOGGING<br/>📍 Location<br/>⚡ Speed<br/>🧭 Heading<br/>📊 Movement Parameters"}}
-    
-    CORE -->|Primary Data Flow| DB[(Time-Series<br/>Database)]
-    
-    DB -.->| Geofense Objective| FENCE[Geofence<br/>Validator]
-    FENCE -.-> NOTIFY[Push<br/>Notification]
-    
-    PI -.->|Optional Objective | META[LTE/GSM<br/>Metadata]
+
+    PI --> PARSE[GPS Parser & <br/>Movement Calculator]
+
+    PARSE -->|Core Function| CORE{{"CONTINUOUS LOGGING<br/>📍 Location  ⚡ Speed  🧭 Heading  📊 Movement Parameters"}}
+
+    CORE -->|Primary Data Flow| DB[(Time-Series Database)]
+
+    DB -.->|Geofence Objective| FENCE[Geofence Validator]
+    FENCE -.-> NOTIFY[Push Notification]
+
+    PI -.->|Optional Objective| META[LTE/GSM Metadata Collector]
     META -.->|Cell Data| DB
-    
+
+    %% Styling
     style GPS fill:#64b5f6,stroke:#1976d2,stroke-width:2px
     style PI fill:#81c784,stroke:#388e3c,stroke-width:2px
     style PARSE fill:#4db6ac,stroke:#00796b,stroke-width:2px
-    style CORE fill:#ffd54f,stroke:#f57c00,stroke-width:4px
+    style CORE fill:#ffd54f,stroke:#f57c00,stroke-width:3px
     style DB fill:#ffb74d,stroke:#e64a19,stroke-width:3px
-    style FENCE fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
-    style NOTIFY fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
-    style META fill:#e0e0e0,stroke:#757575,stroke-width:1px,stroke-dasharray: 5 5
-```
-
-For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
-
----
+    style FENCE fill:#eeeeee,stroke:#757575,stroke-width:1px,stroke-dasharray:4 3
+    style NOTIFY fill:#eeeeee,stroke:#757575,stroke-width:1px,stroke-dasharray:4 3
+    style META fill:#eeeeee,stroke:#757575,stroke-width:1px,stroke-dasharray:4 3
