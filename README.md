@@ -72,25 +72,30 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ```mermaid
 graph TB
+    %% ---------- Hardware ----------
     GPS["🔌 GPS Receiver<br/>BU-353N<br/><i>Hardware</i>"]
     LTE["🔌 LTE Modem EM7565<br/><i>Hardware - Optional</i>"]
-    
+
     GPS -->|USB/NMEA| PI{{"💻 RASPBERRY PI 5<br/>Central Processing Unit<br/><i>Software Runtime</i>"}}
     LTE -.->|USB/AT| PI
-    
-    PI ==>|"Primary Path"| PARSE["⚙️ GPS Parser &<br/>Movement Calculator"]
+
+    %% ---------- Software Ingest ----------
+    PI ==>|Primary Path| PARSE["⚙️ GPS Parser &<br/>Movement Calculator"]
     PI -.->|"Optional Path"| META["📡 LTE/GSM Metadata<br/>Parser & Collector"]
-    
-    PARSE ==> CORE["🎯 CORE PROCESSING<br/>━━━━━━━━━━━━━━<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📊 Parameter Logging<br/>━━━━━━━━━━━━━━"]
+
+    %% ---------- Core Processing (includes Cellular Logging) ----------
+    PARSE ==> CORE["🎯 CORE PROCESSING<br/>━━━━━━━━━━━━━━<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📶 Cellular Logging (LTE/GSM)<br/>📊 Parameter Logging<br/>━━━━━━━━━━━━━━"]
     META -.->|"Cell Metrics Processing"| CORE
-    
-    CORE ==>|"Primary Data Flow"| DB[("💾 Time-Series Database<br/>SQLite / PostgreSQL")]
-    
+
+    %% ---------- Database & Outputs ----------
+    CORE ==>|Primary Data Flow| DB[("💾 Time-Series Database<br/>SQLite / PostgreSQL")]
     DB -->|"Export"| FILES["📁 File Outputs<br/>CSV / GeoJSON<br/>Merged GPS+Cellular Data"]
-    
-    DB -.->|"Feature Branch"| FENCE["🗺️ Geofence Validator<br/>GeoJSON"]
-    FENCE -.->|"On Violation"| NOTIFY["🔔 Push Notification<br/>ntfy.sh"]
-    
+
+    %% ---------- Geofence & Notification (optional feature branch) ----------
+    DB -.->|"Feature Branch"| FENCE["🗺️ Geofence Validator<br/>GeoJSON - Optional"]
+    FENCE -.->|"On Violation"| NOTIFY["🔔 Push Notification<br/>ntfy.sh - Optional"]
+
+    %% ---------- Styles ----------
     classDef hardware fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000
     classDef hardwareOpt fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,stroke-dasharray: 5 5,color:#666
     classDef central fill:#4caf50,stroke:#1b5e20,stroke-width:4px,color:#000
@@ -99,18 +104,13 @@ graph TB
     classDef softwareOpt fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray: 5 5,color:#666
     classDef database fill:#ffb74d,stroke:#e64a19,stroke-width:2px,color:#000
     classDef optional fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,stroke-dasharray: 5 5,color:#666
-    
+
     class GPS hardware
     class LTE hardwareOpt
     class PI central
     class PARSE software
+    class META softwareOpt
     class CORE core
     class DB database
     class FILES software
-    class META softwareOpt
     class FENCE,NOTIFY optional
-```
-
-For more information on creating diagrams, visit the [GitHub documentation](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams)
-
----
