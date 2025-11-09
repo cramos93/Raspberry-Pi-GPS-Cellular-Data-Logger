@@ -1,120 +1,27 @@
-# **Raspberry Pi GPS Data Logger**
-### Continuous GPS Logging, Motion Analytics, and Geofence Event Detection — with Optional LTE/GSM Contextual Metadata
+# Raspberry Pi GPS Data Logger
 
----
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue.svg)
+![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)
 
-## **1. Objectives**
+Continuous GPS logging system with motion analytics, geofence detection, and optional LTE/GSM metadata capture for Raspberry Pi 5.
 
-### **Primary Objectives**
-- Implement a GPS receiver system on a **Raspberry Pi 5** to record continuous location updates into a centralized database.  
-- Calculate and log movement parameters such as **speed** and **heading** over time.  
-- Define and enforce a **geofence** using a GeoJSON boundary file.  
-- Trigger a **real-time notification** when the geofence is crossed.
+## Features
 
-### **Secondary Objective**
-- **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem.  
-  This allows correlation of spatial and signal data for contextualized geolocation analytics.
+- 🛰️ **Continuous GPS Tracking** - Log position, speed, heading, altitude from GlobalSat BU-353N
+- 📊 **Motion Analytics** - Calculate speed and bearing using Haversine distance formulas
+- 🗺️ **Geofence Detection** - Define boundaries with GeoJSON and get real-time alerts
+- 🔔 **Push Notifications** - Instant alerts via ntfy.sh on geofence violations
+- 📶 **LTE/GSM Metadata** (Optional) - Enrich GPS data with cellular network context
+- 🐳 **Fully Containerized** - Docker Compose deployment for easy setup and portability
+- 💾 **Flexible Storage** - SQLite for single-device or PostgreSQL for multi-device deployments
 
-All modules are containerized for reproducible deployment and long-term unattended operation.
+## Quick Start
 
----
+### Prerequisites
+- Raspberry Pi 5 with Raspberry Pi OS (Bookworm)
+- GlobalSat BU-353N GPS Receiver (USB)
+- Docker and Docker Compose installed
 
-## **2. Project Design Overview**
-
-### **Core Functionality**
-- Continuously log **GPS NMEA sentences** from a **GlobalSat BU-353N GPS puck** connected via USB.  
-- Parse and store **latitude, longitude, timestamp, altitude, speed, and heading** in a structured database.  
-- Compute movement metrics using delta position and Haversine-based distance calculations.  
-- Execute automatically on boot using a **systemd service** or **Docker container**.
-
-### **Geofence and Notification Logic**
-- Load a **GeoJSON** file defining the geofence polygon or radius boundary.  
-- Continuously validate current position against the geofence area.  
-- Log **entry and exit events** with timestamps in the database.  
-- Trigger a **real-time notification** (e.g., via ntfy.sh) upon boundary violation.
-
-### **— Optional: LTE/GSM Metadata Capture**
-- Interface with a **Sierra Wireless EM7565/EM7511 LTE modem** through AT or QMI commands.  
-- Record contextual **cellular metrics**, including:  
-  - Cell ID  
-  - MCC/MNC (Mobile Country & Network Code)  
-  - RSRP (Signal Strength in dBm)  
-  - LTE Band / Radio Access Type  
-- Associate LTE metadata with each GPS timestamp for environmental context and future signal-coverage mapping.  
-
-### **Data Architecture**
-1. **Ingestion Layer** — GPS and LTE data collection through serial interfaces.  
-2. **Analytics Layer** — Movement computation (speed, heading, bearing).  
-3. **Persistence Layer** — Time-series data storage (SQLite/PostgreSQL).  
-4. **Geofence Layer** — Spatial boundary validation using Shapely and GeoJSON.  
-5. **Notification Layer** — REST-based event trigger to external services.  
-6. **Container Layer** — All components modularized and orchestrated via Docker Compose.  
-7. **— Optional: Cellular Context Layer** — Secondary ingestion pipeline for LTE/GSM network metrics.
-
----
-
-## **3. Requirements**
-
-### **Hardware**
-- **Raspberry Pi 5 (8 GB)** with Raspberry Pi OS (Bookworm)  
-- **GlobalSat BU-353N GPS Receiver (USB, SiRF Star IV)**  
-- **— Optional:** Sierra Wireless EM7565 / EM7511 LTE Modem (USB interface)
-
-### **Software**
-- **Python 3.x**
-  - Libraries: `pyserial`, `gps`, `geojson`, `shapely`, `pyproj`, `sqlite3`, `requests`, `datetime`, `re`  
-- **Database:** SQLite (default) or PostgreSQL  
-- **Docker & Docker Compose** for containerized deployment  
-- **Notification Service:** ntfy or equivalent push API  
-
----
-
-### **System Architecture Diagram**
-
-```mermaid
-graph TB
-    %% ---------- Hardware ----------
-    GPS["📡 GPS Receiver<br/>GlobalSat BU-353N<br/><i>Hardware</i>"]
-    LTE["📶 LTE Modem EM7565/EM7511<br/><i>Hardware · Optional</i>"]
-
-    GPS -->|USB/NMEA| PI{{"💻 RASPBERRY PI 5<br/>Central Processing Unit<br/><i>Software Runtime</i>"}}
-    LTE -.->|USB/AT or QMI| PI
-
-    %% ---------- Software Ingest ----------
-    PI ==>|Primary Path| PARSE["⚙️ GPS Parser &<br/>Movement Calculator"]
-    PI -.->|"Optional Path"| META["📡 LTE/GSM Metadata<br/>Parser & Collector"]
-
-    %% ---------- Core Processing (hexagonal symbol, unique) ----------
-    PARSE ==> CORE{{"🎯 CORE PROCESSING ENGINE<br/>━━━━━━━━━━━━━━<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📶 Cellular Logging (LTE/GSM)<br/>📊 Parameter Logging<br/>━━━━━━━━━━━━━━"}}
-    META -.->|"Cell Metrics Processing"| CORE
-
-    %% ---------- Database & Outputs ----------
-    CORE ==>|Primary Data Flow| DB[("💾 Time-Series Database<br/>SQLite / PostgreSQL")]
-    DB -->|"Export"| FILES["📁 File Outputs<br/>CSV / GeoJSON<br/>Merged GPS + Cellular Data"]
-
-    %% ---------- Geofence & Notification (optional feature branch) ----------
-    DB -.->|"Feature Branch"| FENCE["🗺️ Geofence Validator<br/>GeoJSON · Optional"]
-    FENCE -.->|"On Violation"| NOTIFY["🔔 Push Notification<br/>ntfy.sh · Optional"]
-
-    %% ---------- Styles ----------
-    %% Hardware = Grey; Export = Light Blue
-    classDef hardware fill:#e0e0e0,stroke:#424242,stroke-width:2px,color:#000
-    classDef hardwareOpt fill:#eeeeee,stroke:#616161,stroke-width:2px,stroke-dasharray:5 5,color:#555
-    classDef central fill:#4caf50,stroke:#1b5e20,stroke-width:4px,color:#000
-    classDef core fill:#ffe082,stroke:#f9a825,stroke-width:3px,color:#000
-    classDef software fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef softwareOpt fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,stroke-dasharray:5 5,color:#666
-    classDef database fill:#ffb74d,stroke:#e64a19,stroke-width:2px,color:#000
-    classDef export fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000
-    classDef optional fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,stroke-dasharray:5 5,color:#666
-
-    %% ---------- Assign Classes ----------
-    class GPS hardware
-    class LTE hardwareOpt
-    class PI central
-    class PARSE software
-    class META softwareOpt
-    class CORE core
-    class DB database
-    class FILES export
-    class FENCE,NOTIFY optional
+### Installation
+```bash
