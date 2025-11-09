@@ -53,7 +53,295 @@ All modules are containerized for reproducible deployment and long-term unattend
 
 ---
 
-## **3. Requirements**
+## **3. Docker Deployment**
+
+### **3.1 Container Architecture**
+
+The application is deployed as a multi-container system orchestrated by Docker Compose:
+
+- **GPS Logger Container** — Primary service for GPS data collection and processing
+- **PostgreSQL Container** — Optional database service (if not using SQLite)
+- **LTE Monitor Container** — Optional service for cellular metadata collection
+
+### **3.2 Directory Structure**
+```
+raspberry-pi-gps-logger/
+├── docker-compose.yml
+├── Dockerfile
+├── Dockerfile.lte (optional)
+├── requirements.txt
+├── src/
+│   ├── gps_logger.py
+│   ├── geofence_validator.py
+│   ├── lte_monitor.py (optional)
+│   └── utils/
+├── config/
+│   ├── geofence.geojson
+│   └── config.env
+├── data/
+│   └── gps_data.db (SQLite, if used)
+└── logs/
+```
+
+### **3.3 Dockerfile (GPS Logger)**
+```dockerfile
+# Multi-stage build for ARM64 (Raspberry Pi 5)
+FROM python:3.11-slim-bookworm AS base
+
+# Install system dependencies for GPS and spatial libraries
+RUN apt-get update && apt-get install -y \
+    gpsd \
+    gpsd-clients \
+    build-essential \
+    libgeos-dev \
+    libproj-dev \
+    usbutils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source
+COPY src/ ./src/
+COPY config/ ./config/
+
+# Create data and logs directories
+RUN mkdir -p /app/data /app/logs
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV GPS_DEVICE=/dev/ttyUSB0
+ENV DATABASE_PATH=/app/data/gps_data.db
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+  CMD python -c "import sqlite3; conn = sqlite3.connect('$DATABASE_PATH'); conn.close()" || exit 1
+
+# Run the GPS logger
+CMD ["python", "-u", "src/gps_logger.py"]
+```
+
+### **3.4 Dockerfile.lte (Optional LTE Monitor)**
+```dockerfile
+FROM python:3.11-slim-bookworm
+
+# Install USB and modem utilities
+RUN apt-get update && apt-get install -y \
+    usbutils \
+    libqmi-utils \
+    modemmanager \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir pyserial requests
+
+COPY src/lte_monitor.py ./
+
+ENV PYTHONUNBUFFERED=1
+ENV MODEM_DEVICE=/dev/cdc-wdm0
+
+CMD ["python", "-u", "lte_monitor.py"]
+```
+
+### **3.5 docker-compose.yml**
+```yaml
+version: '3.8'
+
+services:
+  gps-logger:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpi-gps-logger
+    restart: unless-stopped
+    privileged: true  # Required for USB device access
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0  # GPS receiver
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    environment:
+      - TZ=America/New_York
+      - GPS_DEVICE=/dev/ttyUSB0
+      - DATABASE_PATH=/app/data/gps_data.db
+      - GEOFENCE_FILE=/app/config/geofence.geojson
+      - NOTIFICATION_URL=${NOTIFICATION_URL}
+    env_file:
+      - ./config/config.env
+    networks:
+      - gps-network
+    depends_on:
+      - postgres  # Optional: remove if using SQLite
+
+  # Optional: PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: rpi-gps-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gps_logger
+      POSTGRES_USER: gpsuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - gps-network
+    ports:
+      - "5432:5432"
+
+  # Optional: LTE/GSM Monitor
+  lte-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.lte
+    container_name: rpi-lte-monitor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/cdc-wdm0:/dev/cdc-wdm0  # LTE modem
+      - /dev/ttyUSB2:/dev/ttyUSB2    # Modem AT interface
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - TZ=America/New_York
+      - MODEM_DEVICE=/dev/cdc-wdm0
+      - DATABASE_PATH=/app/data/gps_data.db
+    networks:
+      - gps-network
+
+networks:
+  gps-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+```
+
+### **3.6 requirements.txt**
+```txt
+pyserial>=3.5
+gps>=3.19
+geojson>=3.0.0
+shapely>=2.0.0
+pyproj>=3.5.0
+requests>=2.31.0
+psycopg2-binary>=2.9.9  # If using PostgreSQL
+python-dateutil>=2.8.2
+```
+
+### **3.7 Configuration File (config/config.env)**
+```bash
+# Notification Service
+NOTIFICATION_URL=https://ntfy.sh/your-topic-name
+
+# Database (if using PostgreSQL)
+DB_PASSWORD=your_secure_password_here
+DB_HOST=postgres
+DB_PORT=5432
+DB_NAME=gps_logger
+DB_USER=gpsuser
+
+# GPS Settings
+GPS_BAUD_RATE=4800
+GPS_TIMEOUT=10
+
+# Geofence Settings
+GEOFENCE_CHECK_INTERVAL=5
+
+# Logging
+LOG_LEVEL=INFO
+```
+
+### **3.8 Deployment Instructions**
+
+#### **Prerequisites**
+
+1. **Install Docker and Docker Compose on Raspberry Pi:**
+```bash
+   curl -fsSL https://get.docker.com -o get-docker.sh
+   sudo sh get-docker.sh
+   sudo usermod -aG docker $USER
+   sudo apt-get install -y docker-compose-plugin
+```
+
+2. **Identify USB Device Paths:**
+```bash
+   # Find GPS device (usually /dev/ttyUSB0 or /dev/ttyACM0)
+   ls -l /dev/tty*
+   
+   # Find LTE modem devices
+   ls -l /dev/cdc-wdm*
+   ls -l /dev/ttyUSB*
+```
+
+#### **Build and Deploy**
+
+1. **Clone the repository:**
+```bash
+   cd raspberry-pi-gps-logger
+```
+
+2. **Create configuration file:**
+```bash
+   cp config/config.env.example config/config.env
+   nano config/config.env  # Edit with your settings
+```
+
+3. **Build and start the containers:**
+```bash
+   # Build containers
+   docker compose build
+   
+   # Start all services
+   docker compose up -d
+   
+   # View logs
+   docker compose logs -f
+```
+
+4. **Auto-start on boot:**
+```bash
+   sudo systemctl enable docker
+```
+
+#### **Monitoring and Maintenance**
+```bash
+# Check container status
+docker compose ps
+
+# Restart services
+docker compose restart gps-logger
+
+# Stop all services
+docker compose down
+
+# Update after code changes
+docker compose build && docker compose up -d
+
+# View resource usage
+docker stats
+```
+
+#### **Data Backup**
+```bash
+# Backup SQLite database
+cp ./data/gps_data.db ./data/backups/gps_data_$(date +%Y%m%d).db
+
+# Backup PostgreSQL
+docker compose exec postgres pg_dump -U gpsuser gps_logger > backup_$(date +%Y%m%d).sql
+```
+
+---
+
+## **4. Requirements**
 
 ### **Hardware**
 - **Raspberry Pi 5 (8 GB)** with Raspberry Pi OS (Bookworm)  
@@ -70,7 +358,6 @@ All modules are containerized for reproducible deployment and long-term unattend
 ---
 
 ### **System Architecture Diagram**
-
 ```mermaid
 graph TB
     %% ---------- Hardware ----------
@@ -118,3 +405,4 @@ graph TB
     class DB database
     class FILES export
     class FENCE,NOTIFY optional
+```
