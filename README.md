@@ -4,6 +4,20 @@
 
 Continuous GPS logging system with motion analytics, geofence detection, and optional LTE/GSM metadata capture for Raspberry Pi 5.
 
+## **1. Objectives**
+
+### **Primary Objectives**
+- Implement a GPS receiver system on a **Raspberry Pi 5** to record continuous location updates into a centralized database.  
+- Calculate and log movement parameters such as **speed** and **heading** over time.  
+- Define and enforce a **geofence** using a GeoJSON boundary file.  
+- Trigger a **real-time notification** when the geofence is crossed.
+
+### **Secondary Objective**
+- **LTE/GSM Logging:** Integrate a cellular metadata capture module to enrich GPS records with LTE/GSM network context (Cell ID, signal strength, band, and registration state) using a **Sierra Wireless EM7565/EM7511** modem.  
+  This allows correlation of spatial and signal data for contextualized geolocation analytics.
+
+All modules are containerized for reproducible deployment and long-term unattended operation.
+
 ## Features
 
 - 🛰️ **Continuous GPS Tracking** - Log position, speed, heading, altitude from GlobalSat BU-353N
@@ -59,15 +73,6 @@ docker compose logs -f gps-logger
 ├── logs/                 # Application logs
 ├── docs/                 # Documentation
 └── docker-compose.yml    # Container orchestration
-```
-
-## Contributing
-
-Contributions welcome! Please open an issue or submit a pull request.
-
-## License
-
-MIT License - see LICENSE file for details.
 
 ## Acknowledgments
 
