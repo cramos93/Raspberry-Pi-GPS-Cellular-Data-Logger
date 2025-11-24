@@ -1,60 +1,47 @@
-# **Raspberry Pi GPS Data Logger**
-### Continuous GPS Logging, Motion Analytics, and Geofence Event Detection — with Optional LTE/GSM Contextual Metadata
+# **Raspberry Pi GPS & Cellular Data Logger**
+### Production GPS Tracking with LTE/GSM Metadata Collection
 
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![Raspberry Pi](https://img.shields.io/badge/-RaspberryPi-C51A4A?logo=Raspberry-Pi)
-
----
-
-## **📋 Table of Contents**
-- [Overview](#overview)
-- [System Architecture](#system-architecture)
-- [Hardware Requirements](#hardware-requirements)
-- [Features](#features)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Database Schema](#database-schema)
-- [Geofencing](#geofencing)
-- [LTE/GSM Monitoring](#ltegsm-monitoring-optional)
-- [Data Export](#data-export)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+![Docker](https://img.shields.io/badge/docker-27.x-2496ED?logo=docker)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
 ## **Overview**
 
-A production-grade GPS vehicle tracking system for Raspberry Pi 5 that records continuous location updates, calculates motion parameters, and monitors geofence boundaries with real-time notifications. Optional LTE/GSM cellular metadata integration provides enriched spatial and signal correlation data.
+Production-ready vehicle tracking system for Raspberry Pi 5 that continuously logs GPS positions, calculates motion parameters, monitors geofence boundaries, and optionally captures LTE/GSM cellular metadata. Designed for mobile deployment with hard power shutdown tolerance and autonomous operation.
 
-**Core Objectives:**
-- Implement continuous GPS logging with NMEA parsing
-- Calculate movement parameters (speed, heading, distance)
-- Define and enforce geofence boundaries with GeoJSON
-- Trigger real-time notifications on boundary crossings
-- *(Optional)* Capture LTE/GSM cellular metadata for signal analysis
+**System Statistics** (Production Deployment):
+- 1,310+ GPS positions logged
+- 693+ LTE observations recorded
+- <30 second recovery time from failures
+- 24/7 unattended operation
+- SQLite with WAL mode for crash resistance
 
 ---
 
 ## **System Architecture**
+
+### **Seven-Layer Architecture**
 ```mermaid
 graph TB
     GPS["📡 GPS Receiver<br/>GlobalSat BU-353N<br/><i>Hardware</i>"]
-    LTE["📶 LTE Modem EM7565/EM7511<br/><i>Hardware · Optional</i>"]
+    LTE["📶 LTE Modem<br/>Sierra Wireless EM7511<br/><i>Hardware · Optional</i>"]
     
-    GPS -->|USB/NMEA| PI{{"💻 RASPBERRY PI 5<br/>Central Processing Unit<br/><i>Software Runtime</i>"}}
-    LTE -.->|USB/AT or QMI| PI
+    GPS -->|USB/NMEA 4800 baud| PI{{"💻 RASPBERRY PI 5<br/>Ubuntu 24.04 LTS<br/>Docker Runtime"}}
+    LTE -.->|USB/QMI Protocol| PI
     
-    PI ==>|Primary Path| PARSE["⚙️ GPS Parser &<br/>Movement Calculator"]
-    PI -.->|"Optional Path"| META["📡 LTE/GSM Metadata<br/>Parser & Collector"]
+    PI ==>|Primary Path| PARSE["⚙️ GPS Parser<br/>NMEA Decoder<br/>Movement Calculator"]
+    PI -.->|Optional Path| META["📡 LTE Monitor<br/>QMI Interface<br/>Signal Metrics"]
     
-    PARSE ==> CORE{{"🎯 CORE PROCESSING ENGINE<br/>━━━━━━━━━━━━━━<br/>📍 Location Tracking<br/>⚡ Speed Calculation<br/>🧭 Heading Analysis<br/>📶 Cellular Logging<br/>📊 Parameter Logging"}}
-    META -.->|"Cell Metrics"| CORE
+    PARSE ==> CORE{{"🎯 CORE ENGINE<br/>━━━━━━━━━━━━━━<br/>📍 Position Logging<br/>⚡ Speed/Heading<br/>📶 Cellular Metadata<br/>🗺️ Geofence Validation<br/>━━━━━━━━━━━━━━"}}
+    META -.->|Cell Metrics| CORE
     
-    CORE ==>|Primary Data| DB[("💾 Time-Series Database<br/>SQLite")]
-    DB -->|Export| FILES["📁 CSV / GeoJSON"]
-    DB -.->|Validation| FENCE["🗺️ Geofence Validator"]
-    FENCE -.->|On Violation| NOTIFY["🔔 Push Notification"]
+    CORE ==>|WAL Mode| DB[("💾 SQLite Database<br/>gps_data.db<br/>1,310 GPS + 693 LTE records")]
+    DB -->|FastAPI| API["🌐 REST API<br/>Port 8000<br/>Dashboard & Endpoints"]
+    DB -.->|GeoJSON| FENCE["🗺️ Geofence<br/>Boundary Validator"]
+    FENCE -.->|On Violation| NOTIFY["🔔 ntfy.sh<br/>Push Notifications"]
     
     classDef hardware fill:#e0e0e0,stroke:#424242,stroke-width:2px
     classDef central fill:#4caf50,stroke:#1b5e20,stroke-width:4px
@@ -66,324 +53,158 @@ graph TB
     class PI central
     class PARSE,META software
     class CORE core
-    class DB database
+    class DB,API database
 ```
 
 **Architecture Layers:**
-1. **Ingestion Layer** - GPS and LTE data collection via USB serial interfaces
-2. **Analytics Layer** - Motion calculations and geospatial processing
-3. **Persistence Layer** - SQLite time-series database with WAL mode
-4. **Validation Layer** - GeoJSON polygon-based geofence checking
-5. **Notification Layer** - REST-based event delivery (ntfy.sh)
-6. **Container Layer** - Docker orchestration for modular deployment
+1. **Hardware Layer** - GPS receiver (GlobalSat BU-353N) + LTE modem (Sierra Wireless EM7511)
+2. **Operating System** - Ubuntu 24.04 LTS with systemd service management
+3. **Container Layer** - Docker Compose orchestration (3 services)
+4. **Application Layer** - Python 3.12 data collectors and parsers
+5. **Data Layer** - SQLite with Write-Ahead Logging (crash-resistant)
+6. **Monitoring Layer** - Self-healing with automatic recovery (<30 sec)
+7. **Network Layer** - REST API, ntfy.sh notifications, geofence alerts
 
 ---
 
-## **Hardware Requirements**
+## **Hardware**
 
-### **Required Components**
-| Component | Model | Interface | Notes |
-|-----------|-------|-----------|-------|
-| **Computer** | Raspberry Pi 5 (8GB) | - | Tested on Bookworm OS |
-| **GPS Receiver** | GlobalSat BU-353N | USB | SiRF Star IV, 4800 baud |
-| **Storage** | MicroSD 32GB+ | - | Class 10 recommended |
+| Component | Model | Specifications |
+|-----------|-------|----------------|
+| **Computer** | Raspberry Pi 5 (8GB) | ARM Cortex-A76, Ubuntu 24.04 LTS |
+| **GPS** | GlobalSat BU-353N | USB, SiRF Star IV, NMEA 0183, 4800 baud |
+| **LTE Modem** | Sierra Wireless EM7511 | USB 3.0, QMI protocol, T-Mobile bands |
+| **Storage** | 64GB+ microSD | ext4 with noatime, commit=60 |
 
-### **Optional Components**
-| Component | Model | Interface | Purpose |
-|-----------|-------|-----------|---------|
-| **LTE Modem** | Sierra Wireless EM7565/EM7511 | USB | Cellular metadata |
-| **SIM Card** | Active carrier SIM | - | Tested with T-Mobile |
+**GPS Details:**
+- Device: `/dev/ttyUSB0` (via `/dev/serial/by-id/...Prolific...`)
+- Update Rate: 1 Hz
+- Cold Start: 45-60 seconds
+- Satellites: 4+ for 2D fix, 5+ for 3D
 
-### **GPS Receiver Details**
-- **Chipset:** SiRF Star IV
-- **Baud Rate:** 4800
-- **Protocol:** NMEA 0183
-- **Update Rate:** 1 Hz
-- **Cold Start:** ~45 seconds
-- **Device Path:** `/dev/ttyUSB0`
-
-### **LTE Modem Details** *(Optional)*
-- **Interface:** USB 3.0 preferred
-- **AT Commands:** `/dev/ttyUSB2`
-- **QMI Device:** `/dev/cdc-wdm0`
-- **Bands:** LTE B2, B4, B7, B12, B66 (T-Mobile)
+**LTE Details** (Optional):
+- QMI Device: `/dev/cdc-wdm0`
+- AT Commands: `/dev/ttyUSB2`
+- Metrics: Cell ID, RSRP, RSRQ, SNR, LTE Band
 
 ---
 
 ## **Features**
 
-### **GPS Tracking**
-✅ Continuous NMEA sentence parsing  
-✅ Position logging (latitude, longitude, altitude)  
-✅ Speed calculation (knots, mph, km/h)  
-✅ Heading/bearing computation  
-✅ Satellite count and HDOP tracking  
-✅ Fix quality monitoring  
+### **Core Capabilities**
+✅ Continuous GPS position logging (NMEA parsing)  
+✅ Motion analytics (speed, heading, distance via Haversine)  
+✅ SQLite time-series database with WAL mode  
+✅ GeoJSON polygon-based geofencing  
+✅ Real-time push notifications (ntfy.sh)  
+✅ Docker containerized deployment  
+✅ Systemd auto-start on boot  
+✅ Hard power shutdown tolerance  
 
-### **Geofencing**
-✅ GeoJSON polygon boundary definitions  
-✅ Point-in-polygon validation  
-✅ Entry/exit event detection  
-✅ Timestamp logging for all events  
-✅ Multi-fence support  
-✅ Real-time push notifications  
-
-### **Data Management**
-✅ SQLite time-series database  
-✅ Write-Ahead Logging (WAL) for reliability  
-✅ Indexed queries for performance  
-✅ CSV/GeoJSON export utilities  
-✅ Automated backup procedures  
-
-### **LTE/GSM Monitoring** *(Optional)*
-✅ Cell ID and network identification  
-✅ Signal strength (RSRP, RSRQ, SNR)  
-✅ LTE band detection  
-✅ MCC/MNC tracking  
-✅ GPS-cellular correlation  
-
-### **System Integration**
-✅ Systemd service for auto-start  
-✅ Docker container support  
-✅ REST API notifications  
-✅ Crash recovery mechanisms  
+### **Advanced Features**
+✅ LTE/GSM cellular metadata collection  
+✅ REST API with interactive dashboard  
+✅ Automated health monitoring & recovery  
+✅ Database integrity checks & backups  
+✅ Self-healing (<30 sec recovery)  
+✅ RAM-based logging (reduced SD writes)  
 
 ---
 
-## **Installation**
+## **Quick Start**
 
-### **1. System Preparation**
+### **1. Clone Repository**
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+git clone https://github.com/cramos93/Raspberry-Pi-GPS-Cellular-Data-Logger.git
+cd Raspberry-Pi-GPS-Cellular-Data-Logger
+```
 
-# Install dependencies
-sudo apt install -y python3-pip python3-serial sqlite3 git
+### **2. Install Dependencies**
+```bash
+# System packages
+sudo apt update
+sudo apt install -y python3-pip sqlite3 docker.io docker-compose
 
-# Install Python packages
+# Python packages
 pip3 install pyserial shapely pyyaml requests
 ```
 
-### **2. Clone Repository**
+### **3. Configure**
 ```bash
-cd ~
-git clone https://github.com/cramos93/Test.git
-cd Test
-```
-
-### **3. Hardware Setup**
-
-**Connect GPS Receiver:**
-```bash
-# Verify GPS device
-ls -la /dev/ttyUSB*
-# Should show: /dev/ttyUSB0
-
-# Test GPS output
-stty -F /dev/ttyUSB0 4800 raw
-timeout 5 cat /dev/ttyUSB0
-# Should see NMEA sentences like $GPRMC, $GPGGA
-```
-
-**Connect LTE Modem (Optional):**
-```bash
-# Verify modem detection
-lsusb | grep Sierra
-
-# Check AT interface
-ls -la /dev/ttyUSB*
-# Should show: /dev/ttyUSB2 (or similar)
-
-# Test AT commands
-sudo screen /dev/ttyUSB2 115200
-AT
-# Should respond: OK
-```
-
-### **4. Database Setup**
-```bash
-# Create data directory
-mkdir -p data
-
-# Initialize database
-sqlite3 data/gps_data.db < database/schema.sql
-
-# Verify tables
-sqlite3 data/gps_data.db ".tables"
-# Should show: gps_data, cellular_data, geofence_events
-```
-
-### **5. Configuration**
-```bash
-# Copy config template
+# Copy configuration template
 cp config/config.yaml.example config/config.yaml
 
-# Edit configuration
+# Edit with your settings
 nano config/config.yaml
 ```
 
----
-
-## **Configuration**
-
-### **Main Configuration File** (`config/config.yaml`)
-```yaml
-# GPS Settings
-gps:
-  device: /dev/ttyUSB0           # USB GPS device path
-  baud_rate: 4800                # BU-353N uses 4800
-  poll_interval: 1               # Read every second
-  timeout: 5                     # Serial timeout
-
-# Database Settings
-database:
-  path: ./data/gps_data.db       # SQLite database location
-  wal_mode: true                 # Enable Write-Ahead Logging
-  backup_interval: 86400         # Daily backups (seconds)
-
-# Geofencing
-geofence:
-  enabled: true                  # Enable geofence monitoring
-  file: config/geofence.geojson  # Boundary definition file
-  check_interval: 60             # Check every 60 seconds
-
-# Notifications
-notifications:
-  enabled: true                  # Enable push notifications
-  service: ntfy                  # Service type
-  url: https://ntfy.sh/your-topic-here
-  on_entry: true                 # Alert on geofence entry
-  on_exit: true                  # Alert on geofence exit
-
-# LTE/GSM Settings (Optional)
-modem:
-  enabled: false                 # Set true to enable
-  device: /dev/ttyUSB2           # AT command interface
-  qmi_device: /dev/cdc-wdm0      # QMI interface
-  poll_interval: 30              # Check every 30 seconds
-
-# Logging
-logging:
-  level: INFO                    # DEBUG, INFO, WARNING, ERROR
-  file: ./logs/gps_logger.log    # Log file location
-  max_size: 10485760             # 10MB max log size
-  backup_count: 5                # Keep 5 old logs
-```
-
-### **Geofence Configuration** (`config/geofence.geojson`)
-```json
-{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Home Zone",
-        "description": "Primary monitoring area"
-      },
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [
-          [
-            [-77.0369, 38.8951],
-            [-77.0369, 38.9051],
-            [-77.0269, 38.9051],
-            [-77.0269, 38.8951],
-            [-77.0369, 38.8951]
-          ]
-        ]
-      }
-    }
-  ]
-}
-```
-
-**To create your own geofence:**
-1. Use [geojson.io](https://geojson.io) to draw boundaries
-2. Export as GeoJSON
-3. Save to `config/geofence.geojson`
-
----
-
-## **Usage**
-
-### **Running GPS Logger**
+### **4. Deploy with Docker**
 ```bash
-# Basic usage
-python3 src/gps/gps_logger.py
-
-# With debug output
-python3 src/gps/gps_logger.py --debug
-
-# Run in background
-nohup python3 src/gps/gps_logger.py > logs/gps.log 2>&1 &
-```
-
-### **Systemd Service (Auto-Start)**
-
-Create service file: `/etc/systemd/system/gps-logger.service`
-```ini
-[Unit]
-Description=GPS Data Logger
-After=network.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/Test
-ExecStart=/usr/bin/python3 /home/pi/Test/src/gps/gps_logger.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable gps-logger.service
-sudo systemctl start gps-logger.service
+# Start all services
+docker compose up -d
 
 # Check status
-sudo systemctl status gps-logger.service
+docker ps
 
 # View logs
-journalctl -u gps-logger.service -f
+docker logs rpi-gps-logger --follow
 ```
 
-### **Viewing Data**
-```bash
-# Latest 10 positions
-sqlite3 data/gps_data.db "
-  SELECT datetime(timestamp), latitude, longitude, speed 
-  FROM gps_data 
-  ORDER BY id DESC 
-  LIMIT 10;
-"
+### **5. Access Dashboard**
+Open browser: `http://[raspberry-pi-ip]:8000`
 
-# Positions from today
-sqlite3 data/gps_data.db "
-  SELECT * FROM gps_data 
-  WHERE date(timestamp) = date('now');
-"
+**Documentation:**
+- [Complete Installation Guide](docs/INSTALLATION.md)
+- [Hardware Setup](docs/HARDWARE_SETUP.md)
+- [Configuration Reference](docs/CONFIGURATION.md)
 
-# Geofence events
-sqlite3 data/gps_data.db "
-  SELECT datetime(timestamp), event_type, fence_name 
-  FROM geofence_events 
-  ORDER BY timestamp DESC;
-"
+---
+
+## **Docker Architecture**
+
+### **Container Stack**
+```yaml
+services:
+  gps-logger:
+    # Collects GPS NMEA data
+    # Parses coordinates, speed, heading
+    # Writes to SQLite database
+    devices: [GPS_DEVICE]
+    restart: unless-stopped
+    
+  lte-monitor:
+    # Collects cellular metadata via QMI
+    # Logs RSRP, RSRQ, Cell ID, Band
+    # Requires ModemManager masked
+    privileged: true
+    restart: unless-stopped
+    
+  api-server:
+    # FastAPI REST endpoints
+    # Real-time dashboard
+    # Data export utilities
+    ports: ["8000:8000"]
+    restart: unless-stopped
 ```
+
+**Health Checks:**
+- GPS Logger: Database connectivity every 60s
+- LTE Monitor: QMI device check every 60s
+- API Server: HTTP endpoint check every 30s
+
+**Auto-Recovery:**
+- Containers restart automatically on failure
+- Systemd service restarts Docker Compose
+- Recovery time: <30 seconds
 
 ---
 
 ## **Database Schema**
 
-### **gps_data table**
+### **gps_data** (Primary Table)
 ```sql
 CREATE TABLE gps_data (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     timestamp TEXT NOT NULL,
     latitude REAL NOT NULL,
     longitude REAL NOT NULL,
@@ -396,28 +217,28 @@ CREATE TABLE gps_data (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+**Records:** 1,310+
 
-### **cellular_data table** *(Optional)*
+### **cell_observations** (LTE Metadata)
 ```sql
-CREATE TABLE cellular_data (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
+CREATE TABLE cell_observations (
+    id INTEGER PRIMARY KEY,
+    ts INTEGER NOT NULL,
     cell_id TEXT,
-    mcc INTEGER,
-    mnc INTEGER,
     rsrp REAL,
     rsrq REAL,
     snr REAL,
     band TEXT,
-    rat TEXT,
+    pci INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+**Records:** 693+
 
-### **geofence_events table**
+### **geofence_events** (Boundary Crossings)
 ```sql
 CREATE TABLE geofence_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     timestamp TEXT NOT NULL,
     event_type TEXT NOT NULL,
     fence_name TEXT,
@@ -427,251 +248,283 @@ CREATE TABLE geofence_events (
 );
 ```
 
+**Database Configuration:**
+- Mode: WAL (Write-Ahead Logging)
+- Sync: FULL
+- Location: `/home/user/gps-data/gps_data.db`
+
+---
+
+## **System Resilience**
+
+### **Hard Shutdown Tolerance**
+The system is designed for mobile vehicle deployment where power can be cut without warning:
+
+- **SQLite WAL Mode:** Protects against corruption during sudden power loss
+- **Filesystem Optimization:** `ext4` with `noatime,commit=60,data=ordered`
+- **RAM Logging:** Active logs in tmpfs, synced every 15 minutes
+- **USB Reset Service:** Ensures devices initialize properly on boot
+
+**Result:** Survives hard power loss mid-write without data corruption
+
+### **Self-Healing Mechanisms**
+- Container auto-restart on failure
+- Health monitoring every 15 minutes
+- Database integrity checks hourly
+- Automatic backup restoration
+- Recovery time: <30 seconds
+
+### **SD Card Longevity**
+- RAM-based logging (90% write reduction)
+- Smart backups (only on changes)
+- `noatime` mount option
+- **Result:** Years of lifespan vs. months
+
+---
+
+## **REST API**
+
+### **Base URL**
+```
+http://[raspberry-pi-ip]:8000
+```
+
+### **Endpoints**
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Interactive dashboard |
+| `GET /docs` | Swagger API documentation |
+| `GET /api/gps/latest` | Latest GPS position |
+| `GET /api/gps/track` | GPS track (GeoJSON) |
+| `GET /api/stats/summary` | System statistics |
+| `GET /api/analysis/track-quality` | GPS quality metrics |
+
+### **Example: Latest Position**
+```bash
+curl http://192.168.11.143:8000/api/gps/latest | jq
+```
+```json
+{
+  "latitude": 39.1234,
+  "longitude": -78.5678,
+  "altitude": 125.5,
+  "speed": 45.2,
+  "heading": 135.0,
+  "satellites": 8,
+  "timestamp": "2025-11-24T10:30:00Z"
+}
+```
+
 ---
 
 ## **Geofencing**
 
-### **How It Works**
-
-1. System loads GeoJSON boundary file at startup
-2. GPS position checked every `check_interval` seconds
-3. Point-in-polygon algorithm validates position
-4. State changes (inside→outside or outside→inside) trigger events
-5. Events logged to database with timestamp
-6. Notifications sent via configured service
-
-### **Creating Geofences**
-
-**Using geojson.io:**
-1. Visit https://geojson.io
-2. Draw polygon around desired area
-3. Click "Save" → "GeoJSON"
-4. Copy content to `config/geofence.geojson`
-
-**Manual GeoJSON:**
+### **Configuration**
+Define boundaries in GeoJSON format:
 ```json
 {
   "type": "Feature",
-  "properties": {"name": "Work"},
+  "properties": {"name": "Home Zone"},
   "geometry": {
     "type": "Polygon",
     "coordinates": [[
-      [lon1, lat1],
-      [lon2, lat2],
-      [lon3, lat3],
-      [lon4, lat4],
-      [lon1, lat1]
+      [-77.0369, 38.8951],
+      [-77.0369, 38.9051],
+      [-77.0269, 38.9051],
+      [-77.0269, 38.8951],
+      [-77.0369, 38.8951]
     ]]
   }
 }
 ```
 
-### **Multiple Geofences**
-```json
-{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "properties": {"name": "Home"},
-      "geometry": {"type": "Polygon", "coordinates": [...]}
-    },
-    {
-      "properties": {"name": "Work"},
-      "geometry": {"type": "Polygon", "coordinates": [...]}
-    }
-  ]
-}
+Save to: `config/geofence.geojson`
+
+**Create boundaries easily:** Use [geojson.io](https://geojson.io) to draw and export
+
+### **How It Works**
+1. Geofence monitor checks position every 60 seconds
+2. Point-in-polygon validation using Shapely
+3. Entry/exit events logged to database
+4. Push notification sent via ntfy.sh
+
+**See:** [Geofencing Guide](docs/GEOFENCING.md) for details
+
+---
+
+## **Project Structure**
+```
+raspberry-pi-gps-cellular-logger/
+├── docker-compose.yml          Docker service definitions
+├── .env                        Environment variables
+│
+├── src/
+│   ├── gps/
+│   │   ├── gps_logger.py       GPS data collector
+│   │   └── nmea_parser.py      NMEA sentence parser
+│   ├── cellular/
+│   │   ├── lte_monitor.py      LTE signal monitor
+│   │   └── qmi_interface.py    QMI protocol handler
+│   └── geofence/
+│       └── geofence_monitor.py Boundary validator
+│
+├── api/
+│   ├── api_server.py           FastAPI REST server
+│   └── dashboard/
+│       └── index.html          Web dashboard
+│
+├── config/
+│   ├── config.yaml.example     Configuration template
+│   └── geofence.geojson        Boundary definitions
+│
+├── database/
+│   └── schema.sql              SQLite schema
+│
+├── scripts/
+│   ├── install.sh              System installation
+│   ├── usb_reset.sh            USB device reset
+│   └── backup.sh               Database backup
+│
+└── docs/
+    ├── INSTALLATION.md         Complete setup guide
+    ├── HARDWARE_SETUP.md       Wiring and connections
+    ├── CONFIGURATION.md        Settings reference
+    ├── USAGE.md                Operation guide
+    └── TROUBLESHOOTING.md      Common issues
 ```
 
 ---
 
-## **LTE/GSM Monitoring** *(Optional)*
+## **System Services**
 
-### **Enabling Cellular Monitoring**
-```yaml
-# config/config.yaml
-modem:
-  enabled: true
-  device: /dev/ttyUSB2
-  qmi_device: /dev/cdc-wdm0
+### **Systemd Integration**
+
+**Main Service:** `gps-tracker.service`
+```ini
+[Unit]
+Description=GPS Tracker Service
+After=docker.service network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/gps-tracker
+ExecStart=/usr/bin/docker compose up
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-### **Running LTE Monitor**
+**USB Reset Service:** `usb-reset-boot.service`
+- Resets USB devices on boot
+- Ensures GPS and modem initialize correctly
+- Runs before main service starts
+
+**Enable auto-start:**
 ```bash
-python3 src/cellular/lte_monitor.py
-```
-
-### **Collected Metrics**
-
-- **Cell ID** - Unique cell tower identifier
-- **MCC/MNC** - Mobile country/network codes
-- **RSRP** - Reference Signal Received Power (dBm)
-- **RSRQ** - Reference Signal Received Quality (dB)
-- **SNR** - Signal-to-Noise Ratio (dB)
-- **Band** - LTE frequency band (B2, B4, etc.)
-- **RAT** - Radio Access Technology (LTE, 5G, etc.)
-
-### **Viewing Cellular Data**
-```bash
-sqlite3 data/gps_data.db "
-  SELECT datetime(timestamp), cell_id, rsrp, band 
-  FROM cellular_data 
-  ORDER BY timestamp DESC 
-  LIMIT 10;
-"
+sudo systemctl enable gps-tracker.service
+sudo systemctl start gps-tracker.service
 ```
 
 ---
 
-## **Data Export**
+## **Monitoring**
 
-### **CSV Export**
-```bash
-# Export GPS data
-sqlite3 -header -csv data/gps_data.db "
-  SELECT * FROM gps_data;
-" > exports/gps_data.csv
+### **Health Checks**
+- Container health: Every 30-60 seconds
+- System health: Every 15 minutes
+- Database integrity: Hourly + on boot
+- Disk space: Every 6 hours
 
-# Export with date range
-sqlite3 -header -csv data/gps_data.db "
-  SELECT * FROM gps_data 
-  WHERE timestamp BETWEEN '2025-01-01' AND '2025-01-31';
-" > exports/january_gps.csv
-```
+### **Automated Backups**
+- Daily at 3 AM
+- Retention: Last 10 backups
+- Location: `/home/user/gps-data/backups/`
 
-### **GeoJSON Export**
-```bash
-# Convert to GeoJSON for mapping tools
-python3 scripts/export_geojson.py --output exports/track.geojson
-```
+### **Notifications**
+Push alerts via [ntfy.sh](https://ntfy.sh):
+- Geofence boundary crossings
+- System startup
+- Container failures
+- Low disk space warnings
 
-### **Merged GPS + Cellular Data**
-```bash
-# Export combined dataset
-sqlite3 -header -csv data/gps_data.db "
-  SELECT 
-    g.timestamp,
-    g.latitude,
-    g.longitude,
-    g.speed,
-    c.cell_id,
-    c.rsrp,
-    c.band
-  FROM gps_data g
-  LEFT JOIN cellular_data c 
-    ON datetime(g.timestamp) = datetime(c.timestamp)
-  ORDER BY g.timestamp;
-" > exports/combined_data.csv
-```
+**Configure:** Add your ntfy.sh topic in `config/config.yaml`
 
 ---
 
-## **Troubleshooting**
+## **Performance**
 
-### **GPS Not Working**
+### **Resource Usage**
+- CPU: 5-15% average
+- Memory: ~200MB (all containers)
+- Disk I/O: Minimal (batched writes)
+- Network: <1KB/minute
 
-**Problem:** No GPS device found
-```bash
-# Check USB connection
-lsusb | grep Prolific
+### **Data Growth**
+- GPS: ~250 bytes/record
+- LTE: ~80 bytes/record
+- Daily: ~20MB (continuous GPS fix)
+- Annual: ~8GB projected
 
-# Verify device path
-ls -la /dev/ttyUSB*
+---
 
-# Check permissions
-sudo chmod 666 /dev/ttyUSB0
-```
+## **Documentation**
 
-**Problem:** No NMEA data
-```bash
-# Test raw output
-cat /dev/ttyUSB0
+### **Setup & Configuration**
+- **[Installation Guide](docs/INSTALLATION.md)** - Complete system setup
+- **[Hardware Setup](docs/HARDWARE_SETUP.md)** - GPS and LTE wiring
+- **[Configuration Reference](docs/CONFIGURATION.md)** - All settings explained
 
-# Check baud rate
-stty -F /dev/ttyUSB0 4800
+### **Operation**
+- **[Usage Guide](docs/USAGE.md)** - Running and managing the system
+- **[Geofencing Setup](docs/GEOFENCING.md)** - Creating boundaries
+- **[Data Export](docs/DATA_EXPORT.md)** - CSV, GeoJSON export
 
-# Verify GPS has clear sky view (may take 5-10 minutes for cold start)
-```
+### **Maintenance**
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and fixes
+- **[System Architecture](SYSTEM_ARCHITECTURE_COMPLETE.md)** - Deep technical details
 
-**Problem:** Garbled data
-- Wrong baud rate - try 9600 instead of 4800
-- USB cable issue - try different cable/port
-- Power issue - use powered USB hub
+---
 
-### **Database Issues**
+## **Use Cases**
 
-**Problem:** Database locked
-```bash
-# Check for other processes
-fuser data/gps_data.db
+- **Vehicle Tracking** - Real-time fleet monitoring
+- **Asset Management** - Equipment location tracking
+- **Network Analysis** - LTE coverage mapping
+- **Research** - Spatial mobility studies
+- **Geofencing** - Boundary enforcement and alerts
 
-# Kill blocking process
-kill -9 <PID>
+---
 
-# Verify WAL mode
-sqlite3 data/gps_data.db "PRAGMA journal_mode;"
-```
+## **Technology Stack**
 
-**Problem:** Corrupt database
-```bash
-# Check integrity
-sqlite3 data/gps_data.db "PRAGMA integrity_check;"
-
-# Restore from backup
-cp data/backup_*.db data/gps_data.db
-```
-
-### **LTE Modem Issues**
-
-**Problem:** Modem not detected
-```bash
-# Check USB enumeration
-lsusb
-
-# Check for QMI device
-ls -la /dev/cdc-wdm*
-
-# Restart modem
-sudo usbreset <device-id>
-```
-
-**Problem:** No network registration
-```bash
-# Check SIM status
-sudo qmicli -d /dev/cdc-wdm0 --uim-get-card-status
-
-# Force network search
-sudo qmicli -d /dev/cdc-wdm0 --nas-network-scan
-```
-
-### **Notification Issues**
-
-**Problem:** Notifications not working
-```bash
-# Test ntfy.sh manually
-curl -d "Test message" https://ntfy.sh/your-topic
-
-# Check network connectivity
-ping -c 4 ntfy.sh
-
-# Verify URL in config
-cat config/config.yaml | grep url
-```
+- **Python 3.12** - Core application logic
+- **SQLite** - Time-series database with WAL
+- **Docker & Docker Compose** - Container orchestration
+- **FastAPI** - REST API framework
+- **Shapely** - Geospatial operations
+- **systemd** - Service management
+- **ntfy.sh** - Push notifications
 
 ---
 
 ## **License**
 
-Copyright (c) 2025 cramos93
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
+MIT License - see [LICENSE](LICENSE) for details
 
 ---
 
-**Built for Raspberry Pi 5** | **Tested with GlobalSat BU-353N GPS** | **Sierra Wireless EM7511 LTE Support**
+## **Acknowledgments**
+
+Built for production deployment on Raspberry Pi 5 with emphasis on reliability, autonomous operation, and hard shutdown tolerance. Tested with GlobalSat BU-353N GPS receiver and Sierra Wireless EM7511 LTE modem.
+
+**Location:** Winchester, Virginia, USA  
+**Status:** Production Ready  
+**Last Updated:** November 2025
+
+---
+
+**[⭐ Star this repo](https://github.com/cramos93/Raspberry-Pi-GPS-Cellular-Data-Logger)** if you find it useful!
