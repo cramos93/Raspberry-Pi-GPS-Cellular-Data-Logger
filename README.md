@@ -5,7 +5,6 @@
 ![Raspberry Pi](https://img.shields.io/badge/-RaspberryPi-C51A4A?logo=Raspberry-Pi)
 ![Docker](https://img.shields.io/badge/docker-27.x-2496ED?logo=docker)
 
-
 ---
 
 ## **Objectives**
@@ -114,69 +113,203 @@ graph TB
 
 ---
 
-## **System Statistics** (Production Deployment)
-- 1,310+ GPS positions logged
-- 693+ LTE observations recorded
-- <30 second recovery time from failures
-- 24/7 unattended operation
-- SQLite with WAL mode for crash resistance
+## **System Features & Data Flow**
+
+```mermaid
+graph TB
+    subgraph INPUTS["📡 DATA INGESTION LAYER"]
+        direction TB
+        GPS_IN["<b>GPS Receiver</b><br/>━━━━━━━━━━━━━━━<br/>📍 NMEA 0183 Protocol<br/>🔄 1 Hz Update Rate<br/>📊 Position & Timestamp<br/>🛰️ Satellite Count & HDOP<br/>━━━━━━━━━━━━━━━<br/><i>src/gps/gps_logger.py</i>"]
+        
+        LTE_IN["<b>LTE/GSM Monitor</b><br/>━━━━━━━━━━━━━━━<br/>📶 QMI Protocol<br/>📡 Cell ID & MCC/MNC<br/>📊 RSRP, RSRQ, SNR<br/>📻 LTE Band Detection<br/>━━━━━━━━━━━━━━━<br/><i>src/cellular/lte_monitor.py</i><br/><b>Optional</b>"]
+    end
+    
+    subgraph PROCESSING["⚙️ REAL-TIME ANALYTICS LAYER"]
+        direction TB
+        PARSE_P["<b>NMEA Parser</b><br/>━━━━━━━━━━━━━━━<br/>🔍 Sentence Validation<br/>📐 Coordinate Extraction<br/>🧮 Data Type Conversion<br/>━━━━━━━━━━━━━━━<br/><i>src/gps/nmea_parser.py</i>"]
+        
+        MOTION_P["<b>Motion Analytics</b><br/>━━━━━━━━━━━━━━━<br/>⚡ Speed Calculation<br/>🧭 Heading/Bearing<br/>📏 Haversine Distance<br/>🎯 Movement Detection<br/>━━━━━━━━━━━━━━━<br/><i>src/gps/movement_calc.py</i>"]
+        
+        FENCE_P["<b>Geofence Engine</b><br/>━━━━━━━━━━━━━━━<br/>🗺️ GeoJSON Boundary Load<br/>📍 Point-in-Polygon Test<br/>🚪 Entry/Exit Detection<br/>⏱️ Event Timestamping<br/>━━━━━━━━━━━━━━━<br/><i>src/geofence/monitor.py</i>"]
+    end
+    
+    subgraph PERSISTENCE["💾 DATA PERSISTENCE LAYER"]
+        direction TB
+        DB_P["<b>SQLite Database</b><br/>━━━━━━━━━━━━━━━<br/>📊 Time-Series Storage<br/>✍️ Write-Ahead Logging<br/>🔒 ACID Transactions<br/>📇 Indexed Queries<br/>━━━━━━━━━━━━━━━<br/><i>database/schema.sql</i>"]
+        
+        BACKUP_P["<b>Backup System</b><br/>━━━━━━━━━━━━━━━<br/>🕐 Daily Snapshots<br/>✅ Integrity Checks<br/>🔄 Auto-Recovery<br/>━━━━━━━━━━━━━━━<br/><i>scripts/backup.sh</i>"]
+        
+        EXPORT_P["<b>Export Utilities</b><br/>━━━━━━━━━━━━━━━<br/>📄 CSV Format<br/>🗺️ GeoJSON Tracks<br/>🔗 API Access<br/>━━━━━━━━━━━━━━━<br/><i>api/export_handler.py</i>"]
+    end
+    
+    subgraph INTERFACE["🌐 USER INTERFACE LAYER"]
+        direction TB
+        API_I["<b>REST API</b><br/>━━━━━━━━━━━━━━━<br/>⚡ FastAPI Framework<br/>📖 Swagger Docs<br/>🔍 Query Endpoints<br/>📊 Statistics API<br/>━━━━━━━━━━━━━━━<br/><i>api/api_server.py</i>"]
+        
+        DASH_I["<b>Web Dashboard</b><br/>━━━━━━━━━━━━━━━<br/>🗺️ Leaflet.js Maps<br/>📈 Real-Time Tracking<br/>📊 Quality Metrics<br/>🎨 Interactive UI<br/>━━━━━━━━━━━━━━━<br/><i>api/dashboard/index.html</i>"]
+        
+        NOTIFY_I["<b>Push Notifications</b><br/>━━━━━━━━━━━━━━━<br/>🔔 Geofence Alerts<br/>⚠️ System Events<br/>📱 ntfy.sh Integration<br/>━━━━━━━━━━━━━━━<br/><i>scripts/notification_mgr.sh</i>"]
+    end
+    
+    %% Primary Data Flow (GPS - Required)
+    GPS_IN ==>|"NMEA Stream"| PARSE_P
+    PARSE_P ==>|"Parsed Coordinates"| MOTION_P
+    PARSE_P ==>|"Position Data"| FENCE_P
+    MOTION_P ==>|"GPS + Metrics"| DB_P
+    FENCE_P ==>|"Position + Events"| DB_P
+    
+    %% Optional LTE Flow
+    LTE_IN -.->|"Cell Metrics"| DB_P
+    
+    %% Database Operations
+    DB_P ==>|"Continuous Backup"| BACKUP_P
+    DB_P ==>|"Data Access"| EXPORT_P
+    DB_P ==>|"Query Interface"| API_I
+    
+    %% User Interface Outputs
+    API_I ==>|"REST Endpoints"| DASH_I
+    FENCE_P ==>|"Boundary Events"| NOTIFY_I
+    
+    %% Annotations
+    GPS_IN -.->|"USB /dev/ttyUSB0"| PARSE_P
+    LTE_IN -.->|"QMI /dev/cdc-wdm0"| DB_P
+    
+    %% Styling
+    classDef inputStyle fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000
+    classDef processStyle fill:#fff3e0,stroke:#f57c00,stroke-width:3px,color:#000
+    classDef storageStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#000
+    classDef interfaceStyle fill:#e8f5e9,stroke:#388e3c,stroke-width:3px,color:#000
+    classDef optionalStyle fill:#fafafa,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray: 5 5,color:#666
+    
+    class GPS_IN inputStyle
+    class LTE_IN optionalStyle
+    class PARSE_P,MOTION_P,FENCE_P processStyle
+    class DB_P,BACKUP_P,EXPORT_P storageStyle
+    class API_I,DASH_I,NOTIFY_I interfaceStyle
+    
+    %% Subgraph Styling
+    style INPUTS fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    style PROCESSING fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    style PERSISTENCE fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style INTERFACE fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+```
+
+### **Feature Layer Details**
+
+#### **📡 Data Ingestion Layer**
+Primary input sources for real-time geolocation data collection.
+
+| Component | Purpose | Technology | Status |
+|-----------|---------|------------|--------|
+| GPS Receiver | Continuous position tracking | NMEA 0183 @ 4800 baud | ✅ Required |
+| LTE Monitor | Cellular network metadata | QMI protocol via libqmi | ⚠️ Optional |
+
+**References:**
+- GPS Implementation: [`src/gps/gps_logger.py`](src/gps/gps_logger.py)
+- LTE Implementation: [`src/cellular/lte_monitor.py`](src/cellular/lte_monitor.py)
+- Hardware Setup: [docs/HARDWARE_SETUP.md](docs/HARDWARE_SETUP.md)
 
 ---
 
-## **Features**
+#### **⚙️ Real-Time Analytics Layer**
+Processes raw sensor data into actionable intelligence and events.
 
-<table>
-<tr>
-<td width="50%" valign="top">
+| Component | Purpose | Algorithm | Output |
+|-----------|---------|-----------|--------|
+| NMEA Parser | Decode GPS sentences | Regex + validation | Structured coordinates |
+| Motion Analytics | Calculate movement | Haversine formula | Speed, heading, distance |
+| Geofence Engine | Boundary validation | Point-in-polygon (Shapely) | Entry/exit events |
 
-### 📡 **GPS Tracking**
-- ✅ Continuous NMEA parsing
-- ✅ Position, altitude logging
-- ✅ Speed & heading calculation
-- ✅ Satellite count & HDOP
-- ✅ Fix quality monitoring
+**References:**
+- NMEA Parsing: [`src/gps/nmea_parser.py`](src/gps/nmea_parser.py)
+- Motion Calculations: [`src/gps/movement_calc.py`](src/gps/movement_calc.py)
+- Geofence Logic: [`src/geofence/geofence_monitor.py`](src/geofence/geofence_monitor.py)
+- Geofence Configuration: [docs/GEOFENCING.md](docs/GEOFENCING.md)
 
-### 🗺️ **Geofencing**
-- ✅ GeoJSON polygon boundaries
-- ✅ Point-in-polygon validation
-- ✅ Entry/exit event detection
-- ✅ Multi-fence support
-- ✅ Real-time push alerts
+---
 
-### 💾 **Data Management**
-- ✅ SQLite time-series database
-- ✅ Write-Ahead Logging (WAL)
-- ✅ Indexed queries
-- ✅ CSV/GeoJSON export
-- ✅ Automated backups
+#### **💾 Data Persistence Layer**
+Reliable, crash-resistant storage with automated maintenance.
 
-</td>
-<td width="50%" valign="top">
+| Component | Purpose | Technology | Frequency |
+|-----------|---------|------------|-----------|
+| SQLite Database | Time-series storage | WAL mode + FULL sync | Continuous |
+| Backup System | Data redundancy | Automated snapshots | Daily @ 3 AM |
+| Export Utilities | Data extraction | CSV/GeoJSON converters | On-demand |
 
-### 📶 **LTE/GSM Monitoring** *(Optional)*
-- ✅ Cell ID & network tracking
-- ✅ Signal strength (RSRP, RSRQ, SNR)
-- ✅ LTE band detection
-- ✅ MCC/MNC identification
-- ✅ GPS-cellular correlation
+**Database Tables:**
+- `gps_data` - Position, speed, heading, satellites
+- `cell_observations` - LTE signal metrics (optional)
+- `geofence_events` - Boundary crossing events
 
-### 🔧 **System Integration**
-- ✅ Systemd auto-start
+**References:**
+- Database Schema: [`database/schema.sql`](database/schema.sql)
+- Backup Scripts: [`scripts/backup.sh`](scripts/backup.sh)
+- Export API: [`api/export_handler.py`](api/export_handler.py)
+
+---
+
+#### **🌐 User Interface Layer**
+Access points for data visualization, querying, and alerting.
+
+| Component | Purpose | Framework | Access |
+|-----------|---------|-----------|--------|
+| REST API | Programmatic access | FastAPI + Uvicorn | Port 8000 |
+| Web Dashboard | Visual tracking | Leaflet.js + HTML5 | `http://[pi]:8000` |
+| Push Notifications | Real-time alerts | ntfy.sh | Mobile/Desktop |
+
+**API Endpoints:**
+- `GET /api/gps/latest` - Most recent position
+- `GET /api/gps/track` - Historical track (GeoJSON)
+- `GET /api/stats/summary` - System statistics
+- `GET /docs` - Interactive API documentation
+
+**References:**
+- API Server: [`api/api_server.py`](api/api_server.py)
+- Dashboard: [`api/dashboard/index.html`](api/dashboard/index.html)
+- Notification Manager: [`scripts/notification_manager.sh`](scripts/notification_manager.sh)
+- API Documentation: [docs/API.md](docs/API.md)
+
+---
+
+### **Data Flow Summary**
+
+```
+GPS Receiver → NMEA Parser → Motion Analytics → SQLite Database → REST API → Dashboard
+                          ↓                                      ↓
+                    Geofence Engine → Push Notifications    Export Tools
+                    
+LTE Modem → Cell Metrics → SQLite Database (optional path)
+```
+
+**Key Flow Characteristics:**
+- **Primary Path** (solid lines): Required GPS data pipeline
+- **Optional Path** (dashed lines): LTE metadata enhancement
+- **Real-Time Processing**: <1 second latency from GPS to database
+- **Crash Resilient**: WAL mode survives sudden power loss
+- **Self-Healing**: Automatic container restart on failure
+
+---
+
+### **Feature Priorities**
+
+**Mission Critical** (Primary Objectives):
+- ✅ GPS position logging
+- ✅ Speed/heading calculation  
+- ✅ Geofence boundary detection
+- ✅ Real-time notifications
+
+**Enhanced Capabilities** (Secondary Objectives):
+- ⚠️ LTE/GSM metadata collection
+- ✅ Web dashboard visualization
+- ✅ REST API access
+- ✅ Data export utilities
+
+**Infrastructure** (Reliability):
 - ✅ Docker containerization
-- ✅ REST API notifications
+- ✅ Automated backups
 - ✅ Self-healing recovery
 - ✅ Hard shutdown tolerance
-
-### 🌐 **API & Visualization**
-- ✅ FastAPI REST endpoints
-- ✅ Interactive dashboard
-- ✅ Real-time mapping
-- ✅ Track visualization
-- ✅ Quality metrics
-
-</td>
-</tr>
-</table>
 
 ---
 
@@ -312,7 +445,6 @@ CREATE TABLE gps_data (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
-**Records:** 1,310+
 
 ### **cell_observations** (LTE Metadata - Optional)
 ```sql
@@ -328,7 +460,6 @@ CREATE TABLE cell_observations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
-**Records:** 693+
 
 ### **geofence_events** (Boundary Crossings)
 ```sql
@@ -377,6 +508,41 @@ The system is designed for mobile vehicle deployment where power can be cut with
 
 ---
 
+## **Geofencing**
+
+### **Task Implementation**
+1. **Define Boundary:** Create GeoJSON file with polygon coordinates
+2. **Load Configuration:** Geofence monitor reads boundary at startup
+3. **Continuous Validation:** Check GPS position every 60 seconds
+4. **Event Detection:** Log entry/exit when boundary is crossed
+5. **Trigger Notification:** Send push alert via ntfy.sh
+
+### **GeoJSON Configuration**
+```json
+{
+  "type": "Feature",
+  "properties": {"name": "Home Zone"},
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-77.0369, 38.8951],
+      [-77.0369, 38.9051],
+      [-77.0269, 38.9051],
+      [-77.0269, 38.8951],
+      [-77.0369, 38.8951]
+    ]]
+  }
+}
+```
+
+Save to: `config/geofence.geojson`
+
+**Create boundaries easily:** Use [geojson.io](https://geojson.io) to draw and export
+
+**See:** [Geofencing Guide](docs/GEOFENCING.md) for complete implementation details
+
+---
+
 ## **REST API**
 
 ### **Base URL**
@@ -411,41 +577,6 @@ curl http://192.168.11.143:8000/api/gps/latest | jq
   "timestamp": "2025-11-24T10:30:00Z"
 }
 ```
-
----
-
-## **Geofencing**
-
-### **Task Implementation**
-1. **Define Boundary:** Create GeoJSON file with polygon coordinates
-2. **Load Configuration:** Geofence monitor reads boundary at startup
-3. **Continuous Validation:** Check GPS position every 60 seconds
-4. **Event Detection:** Log entry/exit when boundary is crossed
-5. **Trigger Notification:** Send push alert via ntfy.sh
-
-### **GeoJSON Configuration**
-```json
-{
-  "type": "Feature",
-  "properties": {"name": "Home Zone"},
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [[
-      [-77.0369, 38.8951],
-      [-77.0369, 38.9051],
-      [-77.0269, 38.9051],
-      [-77.0269, 38.8951],
-      [-77.0369, 38.8951]
-    ]]
-  }
-}
-```
-
-Save to: `config/geofence.geojson`
-
-**Create boundaries easily:** Use [geojson.io](https://geojson.io) to draw and export
-
-**See:** [Geofencing Guide](docs/GEOFENCING.md) for complete implementation details
 
 ---
 
@@ -606,12 +737,6 @@ Push alerts via [ntfy.sh](https://ntfy.sh):
 - **ntfy.sh** - Push notifications
 
 ---
-
----
-
-## **Acknowledgments**
-
-Built for production deployment on Raspberry Pi 5 with emphasis on reliability, autonomous operation, and hard shutdown tolerance. Tested with GlobalSat BU-353N GPS receiver and Sierra Wireless EM7511 LTE modem.
 
 **Last Updated:** November 2025
 
