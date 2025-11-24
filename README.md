@@ -3,8 +3,6 @@
 
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![Raspberry Pi](https://img.shields.io/badge/-RaspberryPi-C51A4A?logo=Raspberry-Pi)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-in%20development-yellow.svg)
 
 ---
 
