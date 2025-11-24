@@ -750,8 +750,4 @@ Push alerts via [ntfy.sh](https://ntfy.sh):
 
 ---
 
-**Last Updated:** November 2025
 
----
-
-**[⭐ Star this repo](https://github.com/cramos93/Raspberry-Pi-GPS-Cellular-Data-Logger)** if you find it useful!
