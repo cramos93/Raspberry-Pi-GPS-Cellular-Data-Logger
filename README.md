@@ -117,14 +117,14 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph INPUTS["📡 DATA INGESTION LAYER"]
+    subgraph INPUTS["📡 DATA INGESTION"]
         direction TB
         GPS_IN["<b>GPS Receiver</b><br/>━━━━━━━━━━━━━━━<br/>📍 NMEA 0183 Protocol<br/>🔄 1 Hz Update Rate<br/>📊 Position & Timestamp<br/>🛰️ Satellite Count & HDOP<br/>━━━━━━━━━━━━━━━<br/><i>src/gps/gps_logger.py</i>"]
         
         LTE_IN["<b>LTE/GSM Monitor</b><br/>━━━━━━━━━━━━━━━<br/>📶 QMI Protocol<br/>📡 Cell ID & MCC/MNC<br/>📊 RSRP, RSRQ, SNR<br/>📻 LTE Band Detection<br/>━━━━━━━━━━━━━━━<br/><i>src/cellular/lte_monitor.py</i><br/><b>Optional</b>"]
     end
     
-    subgraph PROCESSING["⚙️ REAL-TIME ANALYTICS LAYER"]
+    subgraph PROCESSING["⚙️ REAL-TIME ANALYTICS"]
         direction TB
         PARSE_P["<b>NMEA Parser</b><br/>━━━━━━━━━━━━━━━<br/>🔍 Sentence Validation<br/>📐 Coordinate Extraction<br/>🧮 Data Type Conversion<br/>━━━━━━━━━━━━━━━<br/><i>src/gps/nmea_parser.py</i>"]
         
@@ -133,7 +133,7 @@ graph TB
         FENCE_P["<b>Geofence Engine</b><br/>━━━━━━━━━━━━━━━<br/>🗺️ GeoJSON Boundary Load<br/>📍 Point-in-Polygon Test<br/>🚪 Entry/Exit Detection<br/>⏱️ Event Timestamping<br/>━━━━━━━━━━━━━━━<br/><i>src/geofence/monitor.py</i>"]
     end
     
-    subgraph PERSISTENCE["💾 DATA PERSISTENCE LAYER"]
+    subgraph PERSISTENCE["💾 DATA PERSISTENCE"]
         direction TB
         DB_P["<b>SQLite Database</b><br/>━━━━━━━━━━━━━━━<br/>📊 Time-Series Storage<br/>✍️ Write-Ahead Logging<br/>🔒 ACID Transactions<br/>📇 Indexed Queries<br/>━━━━━━━━━━━━━━━<br/><i>database/schema.sql</i>"]
         
@@ -142,7 +142,7 @@ graph TB
         EXPORT_P["<b>Export Utilities</b><br/>━━━━━━━━━━━━━━━<br/>📄 CSV Format<br/>🗺️ GeoJSON Tracks<br/>🔗 API Access<br/>━━━━━━━━━━━━━━━<br/><i>api/export_handler.py</i>"]
     end
     
-    subgraph INTERFACE["🌐 USER INTERFACE LAYER"]
+    subgraph INTERFACE["🌐 USER INTERFACE"]
         direction TB
         API_I["<b>REST API</b><br/>━━━━━━━━━━━━━━━<br/>⚡ FastAPI Framework<br/>📖 Swagger Docs<br/>🔍 Query Endpoints<br/>📊 Statistics API<br/>━━━━━━━━━━━━━━━<br/><i>api/api_server.py</i>"]
         
