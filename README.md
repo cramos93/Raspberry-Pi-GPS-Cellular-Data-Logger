@@ -293,23 +293,35 @@ LTE Modem → Cell Metrics → SQLite Database (optional path)
 
 ### **Feature Priorities**
 
-**Mission Critical** (Primary Objectives):
-- ✅ GPS position logging
-- ✅ Speed/heading calculation  
-- ✅ Geofence boundary detection
-- ✅ Real-time notifications
+#### **🔴 Mission Critical (P0)** - Primary Objectives
+Core GPS tracking and geofence alerting capabilities.
 
-**Enhanced Capabilities** (Secondary Objectives):
-- ⚠️ LTE/GSM metadata collection
-- ✅ Web dashboard visualization
-- ✅ REST API access
-- ✅ Data export utilities
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| 📍 **GPS Position Logging** | Continuous NMEA parsing and coordinate extraction | `src/gps/gps_logger.py` |
+| ⚡ **Speed/Heading Calc** | Haversine-based motion analytics from position deltas | `src/gps/movement_calc.py` |
+| 🗺️ **Geofence Detection** | Point-in-polygon validation against GeoJSON boundaries | `src/geofence/monitor.py` |
+| 🔔 **Push Notifications** | Real-time alerts via ntfy.sh on boundary violations | `scripts/notification_mgr.sh` |
 
-**Infrastructure** (Reliability):
-- ✅ Docker containerization
-- ✅ Automated backups
-- ✅ Self-healing recovery
-- ✅ Hard shutdown tolerance
+#### **🟡 Enhanced Capabilities (P1)** - Secondary Objectives
+Cellular metadata collection and data access interfaces.
+
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| 📶 **LTE/GSM Metadata** | Cell ID, RSRP, RSRQ, band logging via QMI protocol | `src/cellular/lte_monitor.py` |
+| 🌐 **REST API** | FastAPI endpoints for data access and statistics | `api/api_server.py` |
+| 📊 **Dashboard Viz** | Interactive Leaflet.js map with real-time tracking | `api/dashboard/` |
+| 📄 **Data Export** | CSV/GeoJSON export utilities for external analysis | `api/export_handler.py` |
+
+#### **🔵 Infrastructure (P2)** - Reliability Foundation
+System-level capabilities ensuring autonomous operation.
+
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| 🐳 **Docker Containers** | Modular service isolation and orchestration | `docker-compose.yml` |
+| 💾 **Auto Backups** | Daily database snapshots with integrity checks | `scripts/backup.sh` |
+| 🔄 **Self-Healing** | Automatic container restart on failure (<30s recovery) | Health checks + systemd |
+| 💥 **Crash Tolerance** | SQLite WAL + ext4 optimization for hard shutdowns | System configuration |
 
 ---
 
