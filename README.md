@@ -3,8 +3,6 @@
 
 ![Python](https://img.shields.io/badge/python-3.12+-blue.svg)
 ![Raspberry Pi](https://img.shields.io/badge/-RaspberryPi-C51A4A?logo=Raspberry-Pi)
-![Docker](https://img.shields.io/badge/docker-27.x-2496ED?logo=docker)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 ---
 
@@ -511,10 +509,6 @@ Push alerts via [ntfy.sh](https://ntfy.sh):
 
 ---
 
-## **License**
-
-MIT License - see [LICENSE](LICENSE) for details
-
 ---
 
 ## **Acknowledgments**
@@ -525,6 +519,3 @@ Built for production deployment on Raspberry Pi 5 with emphasis on reliability, 
 **Status:** Production Ready  
 **Last Updated:** November 2025
 
----
-
-**[⭐ Star this repo](https://github.com/cramos93/Raspberry-Pi-GPS-Cellular-Data-Logger)** if you find it useful!
