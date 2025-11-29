@@ -222,8 +222,6 @@ Primary input sources for real-time geolocation data collection.
 | GPS Receiver | Continuous position tracking | NMEA 0183 @ 4800 baud | ✅ Required |
 | LTE Monitor | Cellular network metadata | QMI protocol via libqmi | ⚠️ Optional |
 
-**References:** [`src/gps/gps_logger.py`](src/gps/gps_logger.py) · [`src/cellular/lte_monitor.py`](src/cellular/lte_monitor.py) · [Hardware Setup Guide](docs/HARDWARE_SETUP.md)
-
 #### ⚙️ Real-Time Analytics Layer
 Processes raw sensor data into actionable intelligence and events.
 
@@ -232,8 +230,6 @@ Processes raw sensor data into actionable intelligence and events.
 | NMEA Parser | Decode GPS sentences | Regex + validation | Structured coordinates |
 | Motion Analytics | Calculate movement | Haversine formula | Speed, heading, distance |
 | Geofence Engine | Boundary validation | Point-in-polygon (Shapely) | Entry/exit events |
-
-**References:** [`src/gps/nmea_parser.py`](src/gps/nmea_parser.py) · [`src/gps/movement_calc.py`](src/gps/movement_calc.py) · [`src/geofence/geofence_monitor.py`](src/geofence/geofence_monitor.py) · [Geofencing Guide](docs/GEOFENCING.md)
 
 #### 💾 Data Persistence Layer
 Reliable, crash-resistant storage with automated maintenance.
@@ -246,7 +242,6 @@ Reliable, crash-resistant storage with automated maintenance.
 
 **Database Tables:** `gps_data` (position, speed, heading) · `cell_observations` (LTE metrics) · `geofence_events` (boundary crossings)
 
-**References:** [`database/schema.sql`](database/schema.sql) · [`scripts/backup.sh`](scripts/backup.sh) · [`api/export_handler.py`](api/export_handler.py)
 
 #### 🌐 User Interface Layer
 Access points for data visualization, querying, and alerting.
@@ -259,7 +254,6 @@ Access points for data visualization, querying, and alerting.
 
 **API Endpoints:** `/api/gps/latest` · `/api/gps/track` · `/api/stats/summary` · `/docs` (Swagger)
 
-**References:** [`api/api_server.py`](api/api_server.py) · [`api/dashboard/index.html`](api/dashboard/index.html) · [`scripts/notification_manager.sh`](scripts/notification_manager.sh)
 
 ### Data Flow Summary
 
