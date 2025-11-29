@@ -379,50 +379,6 @@ This system has been validated in production deployment:
 
 ---
 
-## Quick Start
-
-### 1. Clone Repository
-```bash
-git clone https://github.com/cramos93/Raspberry-Pi-GPS-Cellular-Data-Logger.git
-cd Raspberry-Pi-GPS-Cellular-Data-Logger
-```
-
-### 2. Install Dependencies
-```bash
-# System packages
-sudo apt update
-sudo apt install -y python3-pip sqlite3 docker.io docker-compose
-
-# Python packages
-pip3 install pyserial shapely pyyaml requests
-```
-
-### 3. Configure
-```bash
-# Copy configuration template
-cp config/config.yaml.example config/config.yaml
-
-# Edit with your settings
-nano config/config.yaml
-```
-
-### 4. Deploy with Docker
-```bash
-# Start all services
-docker compose up -d
-
-# Check status
-docker ps
-
-# View logs
-docker logs rpi-gps-logger --follow
-```
-
-### 5. Access Dashboard
-Open browser: `http://[raspberry-pi-ip]:8000`
-
----
-
 ## Docker Architecture
 
 ### Container Orchestration Overview
@@ -449,7 +405,7 @@ graph TB
         DATA["./data/<br/>GPS SQLite database"]
         LTE_DATA["./lte-data/<br/>LTE SQLite database"]
         CONFIG["./config/<br/>GeoJSON, YAML"]
-        LOGS["/home/caramos/gps-data/logs/<br/>Application logs"]
+        LOGS["/var/log/gps-tracker/<br/>Application logs"]
     end
     
     subgraph HW["🔌 Hardware Devices"]
@@ -562,7 +518,7 @@ graph LR
 | `./data` | `/app/data` | RW (GPS), RO (API) | GPS SQLite database |
 | `./lte-data` | `/app/data` | RW (LTE only) | LTE SQLite database |
 | `./config` | `/app/config` | RO (GPS, API) | GeoJSON boundaries, YAML config |
-| `/home/caramos/gps-data/logs` | Host logs | WO (GPS, LTE) | Application logs |
+| `/var/log/gps-tracker` | Host logs | WO (GPS, LTE) | Application logs |
 
 ### Device Passthrough
 
@@ -601,7 +557,7 @@ services:
 ```
 
 **Health Checks:**
-- GPS Logger: Database connectivity every 60s
+- GPS Logger: Database connectivity every 30s
 - LTE Monitor: QMI device check every 60s
 - API Server: HTTP endpoint check every 30s
 
@@ -609,6 +565,30 @@ services:
 - Containers restart automatically on failure
 - Systemd service restarts Docker Compose
 - Recovery time: <30 seconds
+
+### Quick Start
+
+```bash
+# 1. Clone repository
+git clone https://github.com/YOUR_USERNAME/Raspberry-Pi-GPS-Cellular-Data-Logger.git
+cd Raspberry-Pi-GPS-Cellular-Data-Logger
+
+# 2. Configure environment
+cp config/config.yaml.example config/config.yaml
+nano config/config.yaml  # Edit GPS device path and settings
+
+# 3. Deploy
+docker compose up -d
+
+# 4. Verify
+docker ps
+docker logs rpi-gps-logger --follow
+
+# 5. Access dashboard
+# http://[raspberry-pi-ip]:8000
+```
+
+**See:** [Complete Installation Guide](docs/INSTALLATION.md) for detailed setup instructions
 
 ---
 
@@ -662,7 +642,7 @@ CREATE TABLE geofence_events (
 **Database Configuration:**
 - Mode: WAL (Write-Ahead Logging)
 - Sync: FULL
-- Location: `/home/user/gps-data/gps_data.db`
+- Location: `./data/gps_data.db`
 
 ---
 
@@ -748,7 +728,7 @@ http://[raspberry-pi-ip]:8000
 
 ### Example: Latest Position
 ```bash
-curl http://192.168.11.143:8000/api/gps/latest | jq
+curl http://[raspberry-pi-ip]:8000/api/gps/latest | jq
 ```
 
 ```json
@@ -811,7 +791,7 @@ sudo systemctl start gps-tracker.service
 ### Automated Backups
 - Daily at 3 AM
 - Retention: Last 10 backups
-- Location: `/home/user/gps-data/backups/`
+- Location: `./backups/`
 
 ### Notifications
 Push alerts via [ntfy.sh](https://ntfy.sh):
@@ -920,5 +900,5 @@ raspberry-pi-gps-cellular-logger/
 
 Built for production deployment on Raspberry Pi 5 with emphasis on reliability, autonomous operation, and hard shutdown tolerance. Tested in mobile vehicle environments with continuous 24/7 operation.
 
-**Status:** Production Ready  
-**Last Updated:** November 2025
+**Status:** 
+**Last Updated:** 29 November 2025
