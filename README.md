@@ -425,6 +425,132 @@ Open browser: `http://[raspberry-pi-ip]:8000`
 
 ## Docker Architecture
 
+### Container Orchestration
+
+```mermaid
+graph TB
+    subgraph HOST["🖥️ RASPBERRY PI 5 HOST SYSTEM"]
+        subgraph SYSTEMD["systemd Services"]
+            GPS_SVC["gps-tracker.service<br/><i>Main orchestrator</i>"]
+            USB_SVC["usb-reset-boot.service<br/><i>USB initialization</i>"]
+        end
+        
+        subgraph DOCKER["🐳 Docker Compose"]
+            direction TB
+            
+            subgraph GPS_CONTAINER["📡 gps-logger Container"]
+                GPS_APP["Python 3.12<br/>━━━━━━━━━━<br/>gps_logger.py<br/>nmea_parser.py<br/>movement_calc.py"]
+                GPS_HEALTH["❤️ Health Check<br/>DB connectivity<br/>Every 60s"]
+            end
+            
+            subgraph LTE_CONTAINER["📶 lte-monitor Container<br/><i>Optional</i>"]
+                LTE_APP["Python 3.12<br/>━━━━━━━━━━<br/>lte_monitor.py<br/>qmi_interface.py"]
+                LTE_HEALTH["❤️ Health Check<br/>QMI device<br/>Every 60s"]
+            end
+            
+            subgraph API_CONTAINER["🌐 api-server Container"]
+                API_APP["FastAPI + Uvicorn<br/>━━━━━━━━━━<br/>api_server.py<br/>export_handler.py<br/>dashboard/"]
+                API_HEALTH["❤️ Health Check<br/>HTTP endpoint<br/>Every 30s"]
+            end
+        end
+        
+        subgraph VOLUMES["💾 Shared Volumes"]
+            DATA_VOL["./data<br/><i>SQLite database</i>"]
+            CONFIG_VOL["./config<br/><i>Configuration files</i>"]
+            LOGS_VOL["./logs<br/><i>Application logs</i>"]
+        end
+        
+        subgraph DEVICES["🔌 Device Access"]
+            GPS_DEV["/dev/ttyUSB0<br/><i>GPS receiver</i>"]
+            QMI_DEV["/dev/cdc-wdm0<br/><i>LTE modem</i>"]
+        end
+    end
+    
+    subgraph EXTERNAL["🌐 External Access"]
+        BROWSER["Web Browser<br/>Port 8000"]
+        NTFY["ntfy.sh<br/>Push notifications"]
+    end
+    
+    %% Systemd relationships
+    USB_SVC -.->|"Runs before"| GPS_SVC
+    GPS_SVC ==>|"Starts/Manages"| DOCKER
+    
+    %% Device connections
+    GPS_DEV -->|"USB passthrough"| GPS_CONTAINER
+    QMI_DEV -.->|"USB passthrough<br/>privileged mode"| LTE_CONTAINER
+    
+    %% Volume mounts
+    GPS_CONTAINER <-->|"Read/Write"| DATA_VOL
+    GPS_CONTAINER <-->|"Read"| CONFIG_VOL
+    GPS_CONTAINER <-->|"Write"| LOGS_VOL
+    
+    LTE_CONTAINER <-->|"Read/Write"| DATA_VOL
+    LTE_CONTAINER <-->|"Write"| LOGS_VOL
+    
+    API_CONTAINER <-->|"Read"| DATA_VOL
+    API_CONTAINER <-->|"Read"| CONFIG_VOL
+    
+    %% Container communication
+    GPS_CONTAINER -.->|"Database writes"| DATA_VOL
+    LTE_CONTAINER -.->|"Database writes"| DATA_VOL
+    API_CONTAINER -.->|"Database reads"| DATA_VOL
+    
+    %% External access
+    API_CONTAINER ==>|"HTTP :8000"| BROWSER
+    GPS_CONTAINER -.->|"Geofence alerts"| NTFY
+    
+    %% Restart policies
+    GPS_CONTAINER -.->|"unless-stopped"| GPS_SVC
+    LTE_CONTAINER -.->|"unless-stopped"| GPS_SVC
+    API_CONTAINER -.->|"unless-stopped"| GPS_SVC
+    
+    %% Styling
+    classDef systemdStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000
+    classDef containerStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:3px,color:#000
+    classDef optionalStyle fill:#fafafa,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray: 5 5,color:#666
+    classDef volumeStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef deviceStyle fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000
+    classDef externalStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000
+    
+    class GPS_SVC,USB_SVC systemdStyle
+    class GPS_CONTAINER,API_CONTAINER containerStyle
+    class LTE_CONTAINER optionalStyle
+    class DATA_VOL,CONFIG_VOL,LOGS_VOL volumeStyle
+    class GPS_DEV,QMI_DEV deviceStyle
+    class BROWSER,NTFY externalStyle
+    
+    style HOST fill:#f5f5f5,stroke:#424242,stroke-width:3px
+    style SYSTEMD fill:#e3f2fd,stroke:#1565c0,stroke-width:1px
+    style DOCKER fill:#fff8e1,stroke:#f57c00,stroke-width:2px
+    style VOLUMES fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
+    style DEVICES fill:#ffebee,stroke:#c62828,stroke-width:1px
+    style EXTERNAL fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
+```
+
+**Architecture Components:**
+
+| Component | Purpose | Restart Policy | Privileges |
+|-----------|---------|----------------|------------|
+| **systemd Services** | Boot orchestration and lifecycle management | Always restart | Root |
+| **gps-logger** | Primary GPS data collection and processing | `unless-stopped` | Standard |
+| **lte-monitor** | Secondary cellular metadata collection | `unless-stopped` | Privileged (QMI access) |
+| **api-server** | REST API and web dashboard | `unless-stopped` | Standard |
+
+**Volume Mappings:**
+
+| Host Path | Container Path | Access | Purpose |
+|-----------|---------------|--------|---------|
+| `./data` | `/app/data` | RW (GPS/LTE), RO (API) | SQLite database storage |
+| `./config` | `/app/config` | RO (all) | Configuration files, GeoJSON |
+| `./logs` | `/app/logs` | WO (GPS/LTE) | Application logs |
+
+**Device Passthrough:**
+
+| Host Device | Container | Mode | Purpose |
+|-------------|-----------|------|---------|
+| `/dev/ttyUSB0` | gps-logger | Standard | GPS NMEA data stream |
+| `/dev/cdc-wdm0` | lte-monitor | Privileged | QMI protocol access |
+
 ### Container Stack
 
 ```yaml
@@ -768,4 +894,7 @@ raspberry-pi-gps-cellular-logger/
 - **[Dockerfile.lte](Dockerfile.lte)** - LTE monitor image (optional)
 - **[Dockerfile.api](Dockerfile.api)** - API server image
 
-**Last Updated:** November 2025
+---
+
+**Last Updated: 29 November 2025
+
