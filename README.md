@@ -367,7 +367,7 @@ System-level capabilities ensuring autonomous operation.
 
 ### Tested Configuration
 
-This system has been validated with the following production setup:
+This system has been validated in production deployment:
 
 - **Operating System**: Ubuntu 24.04 LTS (64-bit)
 - **Kernel**: Linux 6.8+
@@ -425,131 +425,151 @@ Open browser: `http://[raspberry-pi-ip]:8000`
 
 ## Docker Architecture
 
-### Container Orchestration
+### Container Orchestration Overview
 
 ```mermaid
 graph TB
-    subgraph HOST["🖥️ RASPBERRY PI 5 HOST SYSTEM"]
-        subgraph SYSTEMD["systemd Services"]
-            GPS_SVC["gps-tracker.service<br/><i>Main orchestrator</i>"]
-            USB_SVC["usb-reset-boot.service<br/><i>USB initialization</i>"]
-        end
-        
-        subgraph DOCKER["🐳 Docker Compose"]
-            direction TB
-            
-            subgraph GPS_CONTAINER["📡 gps-logger Container"]
-                GPS_APP["Python 3.12<br/>━━━━━━━━━━<br/>gps_logger.py<br/>nmea_parser.py<br/>movement_calc.py"]
-                GPS_HEALTH["❤️ Health Check<br/>DB connectivity<br/>Every 60s"]
-            end
-            
-            subgraph LTE_CONTAINER["📶 lte-monitor Container<br/><i>Optional</i>"]
-                LTE_APP["Python 3.12<br/>━━━━━━━━━━<br/>lte_monitor.py<br/>qmi_interface.py"]
-                LTE_HEALTH["❤️ Health Check<br/>QMI device<br/>Every 60s"]
-            end
-            
-            subgraph API_CONTAINER["🌐 api-server Container"]
-                API_APP["FastAPI + Uvicorn<br/>━━━━━━━━━━<br/>api_server.py<br/>export_handler.py<br/>dashboard/"]
-                API_HEALTH["❤️ Health Check<br/>HTTP endpoint<br/>Every 30s"]
-            end
-        end
-        
-        subgraph VOLUMES["💾 Shared Volumes"]
-            DATA_VOL["./data<br/><i>SQLite database</i>"]
-            CONFIG_VOL["./config<br/><i>Configuration files</i>"]
-            LOGS_VOL["./logs<br/><i>Application logs</i>"]
-        end
-        
-        subgraph DEVICES["🔌 Device Access"]
-            GPS_DEV["/dev/ttyUSB0<br/><i>GPS receiver</i>"]
-            QMI_DEV["/dev/cdc-wdm0<br/><i>LTE modem</i>"]
-        end
+    subgraph BOOT["⚡ System Boot Sequence"]
+        USB["usb-reset-boot.service<br/>Reset USB devices"]
+        MAIN["gps-tracker.service<br/>Start Docker Compose"]
+        USB --> MAIN
     end
     
-    subgraph EXTERNAL["🌐 External Access"]
-        BROWSER["Web Browser<br/>Port 8000"]
-        NTFY["ntfy.sh<br/>Push notifications"]
+    subgraph COMPOSE["🐳 Docker Compose Stack"]
+        direction LR
+        
+        GPS["📡 rpi-gps-logger<br/>━━━━━━━━━━<br/>GPS collection<br/>NMEA parsing<br/>Motion analytics<br/><br/>Health: 30s<br/>Restart: unless-stopped"]
+        
+        LTE["📶 rpi-lte-monitor<br/>━━━━━━━━━━<br/>LTE metadata<br/>QMI interface<br/><br/>Health: 60s<br/>Restart: unless-stopped<br/><i>Privileged · Optional</i>"]
+        
+        API["🌐 gps-api-server<br/>━━━━━━━━━━<br/>FastAPI + Uvicorn<br/>Dashboard<br/>Data export<br/><br/>Health: 30s<br/>Restart: unless-stopped<br/>Port: 8000"]
     end
     
-    %% Systemd relationships
-    USB_SVC -.->|"Runs before"| GPS_SVC
-    GPS_SVC ==>|"Starts/Manages"| DOCKER
+    subgraph STORAGE["💾 Persistent Storage"]
+        DATA["./data/<br/>GPS SQLite database"]
+        LTE_DATA["./lte-data/<br/>LTE SQLite database"]
+        CONFIG["./config/<br/>GeoJSON, YAML"]
+        LOGS["/home/caramos/gps-data/logs/<br/>Application logs"]
+    end
+    
+    subgraph HW["🔌 Hardware Devices"]
+        GPS_DEV["/dev/ttyUSB0<br/>GPS receiver"]
+        LTE_DEV["/dev/cdc-wdm0<br/>LTE modem"]
+    end
+    
+    subgraph EXT["🌐 External Services"]
+        BROWSER["Web Browser<br/>:8000"]
+        NTFY["ntfy.sh<br/>gps-tracker-rpi-pi5"]
+    end
+    
+    %% Boot flow
+    MAIN ==> COMPOSE
     
     %% Device connections
-    GPS_DEV -->|"USB passthrough"| GPS_CONTAINER
-    QMI_DEV -.->|"USB passthrough<br/>privileged mode"| LTE_CONTAINER
+    GPS_DEV --> GPS
+    LTE_DEV -.-> LTE
     
-    %% Volume mounts
-    GPS_CONTAINER <-->|"Read/Write"| DATA_VOL
-    GPS_CONTAINER <-->|"Read"| CONFIG_VOL
-    GPS_CONTAINER <-->|"Write"| LOGS_VOL
+    %% Volume access
+    GPS <-->|RW| DATA
+    GPS -->|RO| CONFIG
+    GPS -->|WO| LOGS
     
-    LTE_CONTAINER <-->|"Read/Write"| DATA_VOL
-    LTE_CONTAINER <-->|"Write"| LOGS_VOL
+    LTE <-->|RW| LTE_DATA
+    LTE -->|WO| LOGS
     
-    API_CONTAINER <-->|"Read"| DATA_VOL
-    API_CONTAINER <-->|"Read"| CONFIG_VOL
-    
-    %% Container communication
-    GPS_CONTAINER -.->|"Database writes"| DATA_VOL
-    LTE_CONTAINER -.->|"Database writes"| DATA_VOL
-    API_CONTAINER -.->|"Database reads"| DATA_VOL
+    API -->|RO| DATA
+    API -->|RO| CONFIG
     
     %% External access
-    API_CONTAINER ==>|"HTTP :8000"| BROWSER
-    GPS_CONTAINER -.->|"Geofence alerts"| NTFY
-    
-    %% Restart policies
-    GPS_CONTAINER -.->|"unless-stopped"| GPS_SVC
-    LTE_CONTAINER -.->|"unless-stopped"| GPS_SVC
-    API_CONTAINER -.->|"unless-stopped"| GPS_SVC
+    API ==> BROWSER
+    GPS -.-> NTFY
     
     %% Styling
-    classDef systemdStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px,color:#000
-    classDef containerStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:3px,color:#000
-    classDef optionalStyle fill:#fafafa,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray: 5 5,color:#666
-    classDef volumeStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef deviceStyle fill:#ffebee,stroke:#c62828,stroke-width:2px,color:#000
-    classDef externalStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef bootStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef containerStyle fill:#fff3e0,stroke:#ef6c00,stroke-width:3px
+    classDef optionalStyle fill:#fafafa,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray:5 5
+    classDef storageStyle fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef hwStyle fill:#ffebee,stroke:#c62828,stroke-width:2px
+    classDef extStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
     
-    class GPS_SVC,USB_SVC systemdStyle
-    class GPS_CONTAINER,API_CONTAINER containerStyle
-    class LTE_CONTAINER optionalStyle
-    class DATA_VOL,CONFIG_VOL,LOGS_VOL volumeStyle
-    class GPS_DEV,QMI_DEV deviceStyle
-    class BROWSER,NTFY externalStyle
-    
-    style HOST fill:#f5f5f5,stroke:#424242,stroke-width:3px
-    style SYSTEMD fill:#e3f2fd,stroke:#1565c0,stroke-width:1px
-    style DOCKER fill:#fff8e1,stroke:#f57c00,stroke-width:2px
-    style VOLUMES fill:#f3e5f5,stroke:#7b1fa2,stroke-width:1px
-    style DEVICES fill:#ffebee,stroke:#c62828,stroke-width:1px
-    style EXTERNAL fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px
+    class USB,MAIN bootStyle
+    class GPS,API containerStyle
+    class LTE optionalStyle
+    class DATA,LTE_DATA,CONFIG,LOGS storageStyle
+    class GPS_DEV,LTE_DEV hwStyle
+    class BROWSER,NTFY extStyle
 ```
 
-**Architecture Components:**
+### Container Details
+
+```mermaid
+graph LR
+    subgraph GPS_CONTAINER["📡 rpi-gps-logger Container"]
+        direction TB
+        GPS_CODE["<b>Application Code</b><br/>src/gps/gps_logger.py<br/>src/gps/nmea_parser.py<br/>src/gps/movement_calc.py"]
+        GPS_ENV["<b>Environment</b><br/>Python 3.12<br/>pyserial, shapely"]
+        GPS_MOUNT["<b>Mounts</b><br/>./data → /app/data (RW)<br/>./config → /app/config (RO)"]
+        GPS_DEV_LINK["<b>Device</b><br/>/dev/ttyUSB0"]
+        
+        GPS_CODE --> GPS_ENV
+        GPS_ENV --> GPS_MOUNT
+        GPS_ENV --> GPS_DEV_LINK
+    end
+    
+    subgraph LTE_CONTAINER["📶 rpi-lte-monitor Container (Optional)"]
+        direction TB
+        LTE_CODE["<b>Application Code</b><br/>src/cellular/lte_monitor.py<br/>src/cellular/qmi_interface.py"]
+        LTE_ENV["<b>Environment</b><br/>Python 3.12<br/>libqmi, AT commands<br/><b>Privileged mode</b>"]
+        LTE_MOUNT["<b>Mounts</b><br/>./lte-data → /app/data (RW)<br/>/dev → /dev (full access)"]
+        LTE_DEV_LINK["<b>Network</b><br/>host mode"]
+        
+        LTE_CODE --> LTE_ENV
+        LTE_ENV --> LTE_MOUNT
+        LTE_ENV --> LTE_DEV_LINK
+    end
+    
+    subgraph API_CONTAINER["🌐 gps-api-server Container"]
+        direction TB
+        API_CODE["<b>Application Code</b><br/>api/api_server.py<br/>api/export_handler.py<br/>api/dashboard/"]
+        API_ENV["<b>Environment</b><br/>FastAPI + Uvicorn<br/>Leaflet.js, Pandas"]
+        API_MOUNT["<b>Mounts</b><br/>./data → /app/data (RO)<br/>./config → /app/config (RO)"]
+        API_PORT["<b>Exposed Port</b><br/>8000:8000"]
+        
+        API_CODE --> API_ENV
+        API_ENV --> API_MOUNT
+        API_ENV --> API_PORT
+    end
+    
+    style GPS_CONTAINER fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    style LTE_CONTAINER fill:#fafafa,stroke:#9e9e9e,stroke-width:2px,stroke-dasharray:5 5
+    style API_CONTAINER fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+```
+
+### Architecture Components
 
 | Component | Purpose | Restart Policy | Privileges |
 |-----------|---------|----------------|------------|
-| **systemd Services** | Boot orchestration and lifecycle management | Always restart | Root |
-| **gps-logger** | Primary GPS data collection and processing | `unless-stopped` | Standard |
-| **lte-monitor** | Secondary cellular metadata collection | `unless-stopped` | Privileged (QMI access) |
-| **api-server** | REST API and web dashboard | `unless-stopped` | Standard |
+| **usb-reset-boot.service** | Initializes USB devices on boot | One-shot | Root |
+| **gps-tracker.service** | Orchestrates Docker Compose | Always restart | Root |
+| **rpi-gps-logger** | Primary GPS data collection | `unless-stopped` | Standard |
+| **rpi-lte-monitor** | Secondary cellular metadata | `unless-stopped` | Privileged (QMI) |
+| **gps-api-server** | REST API and web dashboard | `unless-stopped` | Standard |
 
-**Volume Mappings:**
+### Volume Mappings
 
 | Host Path | Container Path | Access | Purpose |
 |-----------|---------------|--------|---------|
-| `./data` | `/app/data` | RW (GPS/LTE), RO (API) | SQLite database storage |
-| `./config` | `/app/config` | RO (all) | Configuration files, GeoJSON |
-| `./logs` | `/app/logs` | WO (GPS/LTE) | Application logs |
+| `./data` | `/app/data` | RW (GPS), RO (API) | GPS SQLite database |
+| `./lte-data` | `/app/data` | RW (LTE only) | LTE SQLite database |
+| `./config` | `/app/config` | RO (GPS, API) | GeoJSON boundaries, YAML config |
+| `/home/caramos/gps-data/logs` | Host logs | WO (GPS, LTE) | Application logs |
 
-**Device Passthrough:**
+### Device Passthrough
 
 | Host Device | Container | Mode | Purpose |
 |-------------|-----------|------|---------|
-| `/dev/ttyUSB0` | gps-logger | Standard | GPS NMEA data stream |
-| `/dev/cdc-wdm0` | lte-monitor | Privileged | QMI protocol access |
+| `/dev/ttyUSB0` | rpi-gps-logger | Standard | GPS NMEA data stream |
+| `/dev/cdc-wdm0` | rpi-lte-monitor | Privileged + host network | QMI protocol access |
 
 ### Container Stack
 
@@ -896,5 +916,9 @@ raspberry-pi-gps-cellular-logger/
 
 ---
 
-**Last Updated: 29 November 2025
+## Acknowledgments
 
+Built for production deployment on Raspberry Pi 5 with emphasis on reliability, autonomous operation, and hard shutdown tolerance. Tested in mobile vehicle environments with continuous 24/7 operation.
+
+**Status:** Production Ready  
+**Last Updated:** November 2025
