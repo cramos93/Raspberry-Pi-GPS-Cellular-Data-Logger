@@ -409,7 +409,7 @@ graph TB
     
     subgraph EXT["🌐 External Services"]
         BROWSER["Web Browser<br/>:8000"]
-        NTFY["ntfy.sh<br/>gps-tracker-rpi-pi5"]
+        NTFY["ntfy.sh<br/>gps-tracker-YOUR-TOPIC"]
     end
     
     %% Boot flow
@@ -568,21 +568,31 @@ git clone https://github.com/YOUR_USERNAME/Raspberry-Pi-GPS-Cellular-Data-Logger
 cd Raspberry-Pi-GPS-Cellular-Data-Logger
 
 # 2. Configure environment
-cp config/config.yaml.example config/config.yaml
-nano config/config.yaml  # Edit GPS device path and settings
+cp .env.example .env
+nano .env  # Edit GPS_DEVICE path and other settings
 
-# 3. Deploy
+# 3. Configure geofence (optional)
+cp config/geofence.example.geojson config/geofence.geojson
+# Edit coordinates using geojson.io or text editor
+
+# 4. Deploy containers
 docker compose up -d
 
-# 4. Verify
+# 5. Verify operation
 docker ps
 docker logs rpi-gps-logger --follow
 
-# 5. Access dashboard
-# http://[raspberry-pi-ip]:8000
+# 6. Access dashboard
+# Open browser: http://[raspberry-pi-ip]:8000
 ```
 
-**See:** [Complete Installation Guide](docs/INSTALLATION.md) for detailed setup instructions
+**Initial Setup Checklist:**
+- [ ] GPS device connected and visible at `/dev/ttyUSB0`
+- [ ] `.env` file configured with correct device paths
+- [ ] Docker and Docker Compose installed
+- [ ] Port 8000 available for API server
+- [ ] (Optional) LTE modem connected at `/dev/cdc-wdm0`
+- [ ] (Optional) Geofence boundary defined in `config/geofence.geojson`
 
 ---
 
@@ -696,9 +706,17 @@ The system is designed for mobile vehicle deployment where power can be cut with
 
 Save to: `config/geofence.geojson`
 
-**Create boundaries easily:** Use [geojson.io](https://geojson.io) to draw and export
+**Create boundaries easily:** Use [geojson.io](https://geojson.io) to draw and export polygons
 
-**See:** [Geofencing Guide](docs/GEOFENCING.md) for complete implementation details
+### Testing Your Geofence
+```bash
+# Check geofence events
+docker exec rpi-gps-logger sqlite3 /app/data/gps_data.db \
+  "SELECT * FROM geofence_events ORDER BY timestamp DESC LIMIT 10;"
+
+# Monitor in real-time
+docker logs rpi-gps-logger --follow | grep -i geofence
+```
 
 ---
 
@@ -794,7 +812,127 @@ Push alerts via [ntfy.sh](https://ntfy.sh):
 - Container failures
 - Low disk space warnings
 
-**Configure:** Add your ntfy.sh topic in `config/config.yaml`
+**Configure:** Set your ntfy.sh topic in `.env` file
+
+---
+
+## Troubleshooting
+
+### GPS Not Collecting Data
+
+**Symptom:** No GPS records in database
+
+```bash
+# Check USB device
+ls -la /dev/ttyUSB*
+
+# Test GPS output directly
+cat /dev/ttyUSB0
+# Should see NMEA sentences like: $GPGGA,123519,4807.038,N,01131.000,E...
+
+# Check container logs
+docker logs rpi-gps-logger --tail 50
+
+# Restart GPS container
+docker restart rpi-gps-logger
+```
+
+**Common causes:**
+- GPS device not connected or wrong path in `.env`
+- GPS needs clear sky view (satellite acquisition takes 5-10 minutes)
+- Wrong baud rate (try 9600 if 4800 doesn't work)
+- USB power issues (try different port)
+
+### LTE Monitor Not Working
+
+**Symptom:** No cellular data in database
+
+```bash
+# Check QMI device
+ls -la /dev/cdc-wdm0
+
+# Verify ModemManager is masked (it conflicts with QMI)
+systemctl is-active ModemManager
+# Should show: inactive
+
+# Test QMI manually
+qmicli -d /dev/cdc-wdm0 --nas-get-signal-strength
+
+# Check container logs
+docker logs rpi-lte-monitor --tail 50
+```
+
+**Common causes:**
+- ModemManager running (conflicts with direct QMI access)
+- LTE modem not properly initialized
+- Insufficient privileges (container needs `privileged: true`)
+
+### Dashboard Not Accessible
+
+**Symptom:** Cannot reach http://[pi-ip]:8000
+
+```bash
+# Check if API container is running
+docker ps | grep gps-api-server
+
+# Check port binding
+netstat -tuln | grep 8000
+
+# Check API logs
+docker logs gps-api-server --tail 50
+
+# Restart API container
+docker restart gps-api-server
+```
+
+**Common causes:**
+- Firewall blocking port 8000
+- Wrong IP address (check with `hostname -I`)
+- Container failed to start (check logs)
+
+### Database Corruption After Power Loss
+
+**Symptom:** "database disk image is malformed"
+
+```bash
+# Check database integrity
+sqlite3 /path/to/gps_data.db "PRAGMA integrity_check;"
+
+# Restore from backup
+cp ./backups/gps_data_backup_YYYYMMDD.db ./data/gps_data.db
+
+# If no backup, attempt recovery
+sqlite3 /path/to/gps_data.db ".recover" | sqlite3 recovered.db
+```
+
+**Prevention:**
+- System already configured for crash resistance (WAL mode, optimized filesystem)
+- Ensure SD card is high-quality (Class 10, UHS-I recommended)
+- Consider UPS/battery backup for graceful shutdown
+
+### GPS Loses Satellite Lock While Driving
+
+**Symptom:** GPS works initially, then stops logging
+
+```bash
+# Check satellite count degradation
+sqlite3 ./data/gps_data.db \
+  "SELECT timestamp, satellites_used, fix_type 
+   FROM gps_data 
+   ORDER BY timestamp DESC 
+   LIMIT 20;"
+```
+
+**Common causes:**
+- GPS antenna blocked or poorly positioned
+- Heavy tree cover or urban canyon (buildings)
+- GPS receiver overheating
+- USB cable/connection issue
+
+**Solutions:**
+- Use external GPS antenna with roof mount
+- Ensure antenna has clear sky view
+- Check USB cable quality and connections
 
 ---
 
@@ -848,45 +986,65 @@ raspberry-pi-gps-cellular-logger/
 │       └── usb-reset-boot.service  Boot USB reset
 │
 └── 📚 Documentation
-    ├── README.md                   This file
-    │
-    ├── docs/
-    │   ├── INSTALLATION.md         Complete setup guide
-    │   ├── HARDWARE_SETUP.md       GPS and LTE wiring
-    │   ├── CONFIGURATION.md        All settings explained
-    │   ├── USAGE.md                Operation guide
-    │   ├── GEOFENCING.md           Creating boundaries
-    │   ├── DATA_EXPORT.md          CSV, GeoJSON export
-    │   ├── API.md                  REST API reference
-    │   └── TROUBLESHOOTING.md      Common issues and fixes
-    │
-    └── examples/
-        ├── docker-compose.example.yml
-        ├── geofence.example.geojson
-        └── config.example.yaml
+    └── README.md                   This file
 ```
 
-### Key Documentation Files
+### Documentation Overview
 
-#### Setup & Configuration
-- **[Installation Guide](docs/INSTALLATION.md)** - Complete system setup from scratch
-- **[Hardware Setup](docs/HARDWARE_SETUP.md)** - GPS and LTE wiring diagrams
-- **[Configuration Reference](docs/CONFIGURATION.md)** - All settings explained with examples
+This project includes comprehensive inline documentation and configuration examples to get started quickly.
 
-#### Operation
-- **[Usage Guide](docs/USAGE.md)** - Running and managing the system
-- **[Geofencing Setup](docs/GEOFENCING.md)** - Creating and testing boundaries
-- **[Data Export](docs/DATA_EXPORT.md)** - CSV, GeoJSON export utilities
+#### 🚀 Quick Start Resources
+- **docker-compose.yml** - Multi-container orchestration with health checks and volume mappings
+- **.env.example** - Environment variable template with GPS device paths and settings
+- **config.example.yaml** - System configuration reference with all available options
+- **geofence.example.geojson** - Sample boundary polygon for geofencing setup
 
-#### Development
-- **[API Reference](docs/API.md)** - Complete REST API documentation
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+#### 📦 Container Configuration
+- **Dockerfile.gps** - GPS logger image build specification with Python 3.12 and dependencies
+- **Dockerfile.lte** - LTE monitor image (optional) with QMI protocol support
+- **Dockerfile.api** - FastAPI REST API server image with dashboard assets
 
-#### Container Files
-- **[docker-compose.yml](docker-compose.yml)** - Multi-container orchestration
-- **[Dockerfile.gps](Dockerfile.gps)** - GPS logger image
-- **[Dockerfile.lte](Dockerfile.lte)** - LTE monitor image (optional)
-- **[Dockerfile.api](Dockerfile.api)** - API server image
+#### 🔧 System Integration
+- **systemd/gps-tracker.service** - Main service definition for automatic startup
+- **systemd/usb-reset-boot.service** - USB device initialization service
+- **scripts/usb_reset.sh** - USB device reset utility for reliable boot
+- **scripts/backup.sh** - Automated database backup with integrity checks
+
+#### 💾 Database Architecture
+- **database/schema.sql** - Complete SQLite schema with indexes
+  - `gps_data` table: Position, speed, heading, satellite metrics
+  - `cell_observations` table: LTE signal strength, cell towers, bands
+  - `geofence_events` table: Boundary crossing timestamps and locations
+
+#### 🐍 Source Code Structure
+```
+src/
+├── gps/
+│   ├── gps_logger.py          # NMEA parsing and GPS data collection
+│   ├── nmea_parser.py          # Sentence validation and coordinate extraction
+│   └── movement_calc.py        # Haversine-based speed/heading analytics
+├── cellular/
+│   ├── lte_monitor.py          # QMI protocol cellular metadata collection
+│   └── qmi_interface.py        # Low-level QMI command interface
+└── geofence/
+    └── geofence_monitor.py     # Point-in-polygon boundary validation
+```
+
+#### 🌐 API & Dashboard
+- **api/api_server.py** - FastAPI REST endpoints with Swagger documentation
+- **api/export_handler.py** - CSV and GeoJSON export utilities
+- **api/dashboard/index.html** - Interactive Leaflet.js map interface
+
+#### ⚙️ Configuration Management
+All configuration is centralized in `config/config.yaml`:
+- GPS device path and baud rate
+- LTE modem settings (optional)
+- Geofence boundary files
+- Notification URLs (ntfy.sh)
+- Database paths
+- Logging levels
+
+See inline comments in example files for detailed configuration options.
 
 ---
 
@@ -894,5 +1052,11 @@ raspberry-pi-gps-cellular-logger/
 
 Built for production deployment on Raspberry Pi 5 with emphasis on reliability, autonomous operation, and hard shutdown tolerance. Tested in mobile vehicle environments with continuous 24/7 operation.
 
-**Status:** 
-**Last Updated:** 29 November 2025
+**Status**: Production-Ready  
+**Last Updated**: 30 November 2025
+
+---
+
+## License
+
+Free & Public Use
