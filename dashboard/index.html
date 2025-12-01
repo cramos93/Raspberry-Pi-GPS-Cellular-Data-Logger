@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS/LTE Tracker Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+        .container { 
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+            gap: 1px;
+            background: #1e293b;
+        }
+        .header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #3b82f6;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #60a5fa;
+        }
+        .status-badge {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .badge.online { background: #10b981; color: white; }
+        .badge.offline { background: #ef4444; color: white; }
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: white;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #1e293b;
+        }
+        .sidebar {
+            background: #1e293b;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .card {
+            background: #334155;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #475569;
+        }
+        .card h3 {
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #475569;
+        }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .signal-bar {
+            width: 100%;
+            height: 8px;
+            background: #1e293b;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        .signal-fill {
+            height: 100%;
+            transition: width 0.3s, background 0.3s;
+            border-radius: 4px;
+        }
+        .signal-excellent { background: #10b981; }
+        .signal-good { background: #3b82f6; }
+        .signal-fair { background: #f59e0b; }
+        .signal-poor { background: #ef4444; }
+        .update-time {
+            font-size: 11px;
+            color: #64748b;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛰️ GPS/LTE Tracker</h1>
+            <div class="status-badge">
+                <div class="badge online" id="gps-status">
+                    <span class="badge-dot"></span>
+                    <span>GPS: Searching</span>
+                </div>
+                <div class="badge online" id="lte-status">
+                    <span class="badge-dot"></span>
+                    <span>LTE: Online</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <!-- GPS Info Card -->
+            <div class="card">
+                <h3>📍 GPS Status</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Latitude</span>
+                    <span class="stat-value" id="lat">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Longitude</span>
+                    <span class="stat-value" id="lon">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Speed</span>
+                    <span class="stat-value" id="speed">-- km/h</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Satellites</span>
+                    <span class="stat-value" id="sats">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Fix Quality</span>
+                    <span class="stat-value" id="fix">--</span>
+                </div>
+            </div>
+
+            <!-- LTE Info Card -->
+            <div class="card">
+                <h3>📡 LTE Status</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Signal (RSRP)</span>
+                    <span class="stat-value" id="rsrp">-- dBm</span>
+                </div>
+                <div class="signal-bar">
+                    <div class="signal-fill" id="signal-bar" style="width: 0%"></div>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Quality (RSRQ)</span>
+                    <span class="stat-value" id="rsrq">-- dB</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">SNR</span>
+                    <span class="stat-value" id="snr">-- dB</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Observations</span>
+                    <span class="stat-value" id="lte-count">--</span>
+                </div>
+            </div>
+
+            <!-- System Stats Card -->
+            <div class="card">
+                <h3>📊 Statistics</h3>
+                <div class="stat-row">
+                    <span class="stat-label">GPS Records</span>
+                    <span class="stat-value" id="gps-total">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Distance (24h)</span>
+                    <span class="stat-value" id="distance">-- km</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Avg Speed (24h)</span>
+                    <span class="stat-value" id="avg-speed">-- km/h</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Track Quality</span>
+                    <span class="stat-value" id="quality">--</span>
+                </div>
+            </div>
+
+            <div class="update-time" id="update-time">Last updated: --</div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize map centered on YOUR_CITY, VA
+        const map = L.map('map').setView([38.620, -77.913], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(map);
+
+        let currentMarker = null;
+        let trackLine = null;
+        let trackPoints = [];
+
+        // Update dashboard
+        async function updateDashboard() {
+            try {
+                // Fetch latest GPS
+                const latestResp = await fetch('/api/gps/latest');
+                const latest = await latestResp.json();
+                
+                if (latest && latest.latitude) {
+                    document.getElementById('lat').textContent = latest.latitude.toFixed(6);
+                    document.getElementById('lon').textContent = latest.longitude.toFixed(6);
+                    document.getElementById('speed').textContent = (latest.speed || 0).toFixed(1) + ' km/h';
+                    document.getElementById('sats').textContent = latest.satellites_visible || 0;
+                    document.getElementById('fix').textContent = latest.fix_type || 'Unknown';
+                    
+                    // Update GPS status badge
+                    const gpsStatus = document.getElementById('gps-status');
+                    if (latest.fix_type === '3D' || latest.fix_type === '2D') {
+                        gpsStatus.className = 'badge online';
+                        gpsStatus.querySelector('span:last-child').textContent = 'GPS: ' + latest.fix_type + ' Fix';
+                    } else {
+                        gpsStatus.className = 'badge offline';
+                        gpsStatus.querySelector('span:last-child').textContent = 'GPS: No Fix';
+                    }
+                    
+                    // Update map marker
+                    if (currentMarker) {
+                        map.removeLayer(currentMarker);
+                    }
+                    currentMarker = L.marker([latest.latitude, latest.longitude])
+                        .addTo(map)
+                        .bindPopup(`Speed: ${(latest.speed || 0).toFixed(1)} km/h<br>Sats: ${latest.satellites_visible || 0}`);
+                }
+                
+                // Fetch statistics
+                const statsResp = await fetch('/api/stats/summary');
+                const stats = await statsResp.json();
+                
+                if (stats) {
+                    document.getElementById('gps-total').textContent = stats.gps.total_records;
+                    document.getElementById('distance').textContent = (stats.recent.distance_24h || 0).toFixed(2) + ' km';
+                    document.getElementById('avg-speed').textContent = (stats.recent.avg_speed_24h || 0).toFixed(1) + ' km/h';
+                    document.getElementById('lte-count').textContent = stats.lte.total_observations;
+                    document.getElementById('rsrp').textContent = (stats.lte.avg_rsrp || 0).toFixed(1) + ' dBm';
+                    document.getElementById('rsrq').textContent = (stats.lte.avg_rsrq || 0).toFixed(1) + ' dB';
+                    
+                    // Calculate signal bar
+                    const rsrp = stats.lte.avg_rsrp || -120;
+                    let signalPercent = 0;
+                    let signalClass = 'signal-poor';
+                    
+                    if (rsrp >= -80) {
+                        signalPercent = 100;
+                        signalClass = 'signal-excellent';
+                    } else if (rsrp >= -90) {
+                        signalPercent = 75;
+                        signalClass = 'signal-good';
+                    } else if (rsrp >= -100) {
+                        signalPercent = 50;
+                        signalClass = 'signal-fair';
+                    } else if (rsrp >= -110) {
+                        signalPercent = 25;
+                        signalClass = 'signal-poor';
+                    }
+                    
+                    const signalBar = document.getElementById('signal-bar');
+                    signalBar.style.width = signalPercent + '%';
+                    signalBar.className = 'signal-fill ' + signalClass;
+                }
+                
+                // Fetch track quality
+                const qualityResp = await fetch('/api/analysis/track-quality');
+                const quality = await qualityResp.json();
+                
+                if (quality) {
+                    document.getElementById('quality').textContent = quality.quality_rating + ' (' + quality.quality_score.toFixed(1) + '%)';
+                }
+                
+                // Fetch track for map
+                const trackResp = await fetch('/api/gps/track?limit=100');
+                const track = await trackResp.json();
+                
+                if (track && track.features) {
+                    if (trackLine) {
+                        map.removeLayer(trackLine);
+                    }
+                    
+                    trackPoints = track.features.map(f => [
+                        f.geometry.coordinates[1],
+                        f.geometry.coordinates[0]
+                    ]);
+                    
+                    if (trackPoints.length > 0) {
+                        trackLine = L.polyline(trackPoints, {
+                            color: '#3b82f6',
+                            weight: 3,
+                            opacity: 0.7
+                        }).addTo(map);
+                    }
+                }
+                
+                // Update timestamp
+                document.getElementById('update-time').textContent = 
+                    'Last updated: ' + new Date().toLocaleTimeString();
+                    
+            } catch (error) {
+                console.error('Update error:', error);
+            }
+        }
+
+        // Initial update and set interval
+        updateDashboard();
+        setInterval(updateDashboard, 5000); // Update every 5 seconds
+    </script>
+</body>
+</html>

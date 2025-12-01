@@ -1,0 +1,89 @@
+services:
+  gps-logger:
+    build:
+      context: .
+      dockerfile: Dockerfile.gps
+    container_name: rpi-gps-logger
+    restart: unless-stopped
+    devices:
+      - ${GPS_DEVICE}:${GPS_DEVICE}
+    volumes:
+      - /home/USERNAME/gps-data:/app/data
+      - /home/USERNAME/gps-data/logs:/app/logs
+      - ./geofence:/app/config:ro
+    environment:
+      TZ: ${TZ}
+      GPS_DEVICE: ${GPS_DEVICE}
+      GPS_BAUD_RATE: "${GPS_BAUD_RATE}"
+      DATABASE_PATH: /app/data/gps_data.db
+      GEOFENCE_FILE: /app/config/virginia_counties.geojson
+      NOTIFICATION_URL: ${NOTIFICATION_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
+      GEOF_DEBOUNCE_COUNT: "${GEOF_DEBOUNCE_COUNT}"
+      GEOF_MIN_MOVE_M: "${GEOF_MIN_MOVE_M}"
+      SPEED_SMOOTH_ALPHA: "${SPEED_SMOOTH_ALPHA}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/app/data/gps_data.db').close()"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      - gps-network
+
+  lte-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.lte
+    container_name: rpi-lte-monitor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/cdc-wdm0:/dev/cdc-wdm0
+      - ${LTE_SERIAL_DEVICE}:${LTE_SERIAL_DEVICE}
+    volumes:
+      - /home/USERNAME/gps-data:/app/data
+      - /home/USERNAME/gps-data/logs:/app/logs
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+    environment:
+      TZ: ${TZ}
+      MODEM_DEVICE: /dev/cdc-wdm0
+      LTE_SERIAL_DEVICE: ${LTE_SERIAL_DEVICE}
+      DATABASE_PATH: /app/data/gps_data.db
+      LTE_POLL_INTERVAL: "${LTE_POLL_INTERVAL}"
+      LOG_LEVEL: ${LOG_LEVEL}
+      USE_QMI: "${USE_QMI}"
+    healthcheck:
+      test: ["CMD-SHELL", "qmicli -d /dev/cdc-wdm0 --get-wwan-iface >/dev/null 2>&1 || exit 0"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    networks:
+      - gps-network
+
+  api-server:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: gps-api-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./dashboard:/app/dashboard:ro
+      - /home/USERNAME/gps-data:/app/data:ro
+    environment:
+      TZ: ${TZ}
+      DATABASE_PATH: /app/data/gps_data.db
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - gps-network
+
+networks:
+  gps-network:
+    driver: bridge
+    # Dashboard mount (add to api-server volumes)
+    # - ./dashboard:/app/dashboard:ro

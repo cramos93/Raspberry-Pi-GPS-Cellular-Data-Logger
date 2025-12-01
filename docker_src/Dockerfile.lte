@@ -1,0 +1,14 @@
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libqmi-utils \
+    libqmi-proxy \
+    usbutils \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+RUN mkdir -p /app/data /app/logs
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY lte_monitor_qmi.py /app/lte_monitor.py
+ENV PYTHONUNBUFFERED=1
+ENV MODEM_DEVICE=/dev/cdc-wdm0
+CMD ["python", "-u", "/app/lte_monitor.py"]
